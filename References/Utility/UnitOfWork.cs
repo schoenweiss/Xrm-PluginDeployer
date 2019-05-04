@@ -2,7 +2,7 @@
 using Xrm.PluginDeployer.Entities;
 using System;
 
-namespace Xrm.PluginDeployer.EntityExtensions
+namespace Xrm.PluginDeployer.Utility
 {
     public interface UnitOfWork : IDisposable
     {

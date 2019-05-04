@@ -11,7 +11,8 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 using Xrm.PluginDeployer.Entities;
-using Xrm.PluginDeployer.Utility.Tooling;
+using Xrm.PluginDeployer.Model;
+using Xrm.PluginDeployer.Utility;
 
 namespace Xrm.PluginDeployer
 {
@@ -36,13 +37,15 @@ namespace Xrm.PluginDeployer
         /// <summary>
         /// Constructor
         /// </summary>
-        public PluginDeployer(IOrganizationService sourceSystem, IOrganizationService destinationSystem,
-            string solutionPreFix, ConsoleLogger logger)
+        public PluginDeployer( IOrganizationService sourceSystem,
+                               IOrganizationService destinationSystem,
+                               string solutionPreFix,
+                               ConsoleLogger logger )
         {
             this.sourceSystem = sourceSystem;
             this.destinationSystem = destinationSystem;
             this.logger = logger;
-            this.solutionPreFix = solutionPreFix ?? "PluginDeployer_";
+            this.solutionPreFix = solutionPreFix;
         }
 
         /// <summary>
@@ -50,31 +53,40 @@ namespace Xrm.PluginDeployer
         /// </summary>
         /// <param name="filePath"></param>
         /// <returns></returns>
-        public bool LoadAssembly(string filePath)
+        public bool LoadAssembly( string filePath )
         {
-            if (!File.Exists(filePath))
+            if( !File.Exists( filePath ) )
             {
-                logger.Log($"Could not find the specified file at {filePath}");
+                logger.Log( $"Could not find the specified assembly at {filePath}" );
                 return false;
             }
 
-            AssemblyPlugin = Assembly.LoadFrom(filePath);
-            SolutionName = solutionPreFix + AssemblyPlugin.GetName().Name.Replace(".", "");
-            if (SolutionName.Length > 50) SolutionName = SolutionName.Substring(0, 50);
+            GenerateSolutionName( filePath );
 
-            logger.Log("Assembly loaded");
+            logger.Log( "Assembly loaded" );
 
-            var xmlPath = filePath.Replace(".dll", ".xml");
-            if (!File.Exists(xmlPath))
+            var xmlPath = filePath.Replace( ".dll", ".xml" );
+            if( !File.Exists( xmlPath ) )
             {
-                logger.Log($"Could not find the corresponding xml file at {xmlPath}");
+                logger.Log( $"Could not find the corresponding xml file at {xmlPath}" );
                 return false;
             }
 
-            CommentXml = new XmlDocument();
-            CommentXml.Load(xmlPath);
+            CommentXml = new XmlDocument( );
+            CommentXml.Load( xmlPath );
 
             return true;
+        }
+
+        private void GenerateSolutionName( string filePath )
+        {
+            AssemblyPlugin = Assembly.LoadFrom( filePath );
+            SolutionName = solutionPreFix + AssemblyPlugin.GetName( ).Name.Replace( ".", "" ).Replace( "_", "" ).Replace( "-", "" );
+
+            if( SolutionName.Length > 50 )
+            {
+                SolutionName = SolutionName.Substring( 0, 50 );
+            }
         }
 
         /// <summary>
@@ -82,23 +94,23 @@ namespace Xrm.PluginDeployer
         /// </summary>
         /// <param name="pluginAssembly">PluginAssembly or null</param>
         /// <returns></returns>
-        private PluginAssembly UploadPluginAssemblyToDestination(PluginAssembly pluginAssembly)
+        private PluginAssembly UploadPluginAssemblyToDestination( PluginAssembly pluginAssembly )
         {
-            if (AssemblyPlugin == null)
+            if( AssemblyPlugin == null )
             {
-                throw new InvalidOperationException("Load Assembly first");
+                throw new InvalidOperationException( "Load Assembly first" );
             }
 
-            var dllContentBytes = File.ReadAllBytes(AssemblyPlugin.Location);
-            var dllContent = Convert.ToBase64String(dllContentBytes);
+            var dllContentBytes = File.ReadAllBytes( AssemblyPlugin.Location );
+            var dllContent = Convert.ToBase64String( dllContentBytes );
 
-            if (pluginAssembly != null)
+            if( pluginAssembly != null )
             {
-                UpdatePluginAssembly(destinationSystem, pluginAssembly, dllContent);
+                UpdatePluginAssembly( destinationSystem, pluginAssembly, dllContent );
                 return pluginAssembly;
             }
 
-            return CreatePluginAssembly(destinationSystem, AssemblyPlugin, dllContent);
+            return CreatePluginAssembly( destinationSystem, AssemblyPlugin, dllContent );
         }
 
         /// <summary>
@@ -108,62 +120,63 @@ namespace Xrm.PluginDeployer
         /// Workflows are a special type of PluginType
         /// </summary>
         /// <param name="pluginAssembly">PluginAssembly from the destination system</param>
-        private void CreateNewPluginTypesInDestination(PluginAssembly pluginAssembly)
+        private void CreateNewPluginTypesInDestination( PluginAssembly pluginAssembly )
         {
-            var foundPlugins = SearchForPlugins().ToList();
-            var registeredPluginTypes = RetrievePluginTypes(destinationSystem, pluginAssembly.Id).ToList();
+            var foundPlugins = SearchForPlugins( ).ToList( );
+            var registeredPluginTypes = RetrievePluginTypes( destinationSystem, pluginAssembly.Id ).ToList( );
 
             // Create new pluginTypes
-            foreach (var type in foundPlugins)
+            foreach( var type in foundPlugins )
             {
-                var pluginType = registeredPluginTypes.FirstOrDefault(registeredPluginType =>
-                    registeredPluginType.TypeName.Equals(type.FullName));
-                if (pluginType != null)
+                var pluginType = registeredPluginTypes.FirstOrDefault( registeredPluginType =>
+                                                                           registeredPluginType.TypeName.Equals( type.FullName ) );
+                if( pluginType != null )
                 {
-                    UpdatePluginType(destinationSystem, pluginType, type);
+                    UpdatePluginType( destinationSystem, pluginType, type );
                 }
                 else
                 {
-                    CreatePluginType(destinationSystem, pluginAssembly.Id, type);
+                    CreatePluginType( destinationSystem, pluginAssembly.Id, type );
                 }
             }
 
             // Create new workflows
-            var foundWorkflows = SearchForWorkflows().ToList();
-            foreach (var type in foundWorkflows)
+            var foundWorkflows = SearchForWorkflows( ).ToList( );
+            foreach( var type in foundWorkflows )
             {
-                if (!registeredPluginTypes.Any(registeredPluginType =>
-                    registeredPluginType.TypeName.Equals(type.FullName)))
+                if( !registeredPluginTypes.Any( registeredPluginType =>
+                                                    registeredPluginType.TypeName.Equals( type.FullName ) ) )
                 {
-                    CreatePluginType(destinationSystem, pluginAssembly.Id, type);
+                    CreatePluginType( destinationSystem, pluginAssembly.Id, type );
                 }
             }
         }
 
-        private void DeleteStepsByPluginType(PluginType pluginType)
+        private void DeleteStepsByPluginType( PluginType pluginType )
         {
-            var dependentObjects = RetrieveSdkStepsByPluginType(destinationSystem, pluginType);
-            DeleteDependentObjects(destinationSystem, dependentObjects);
+            var dependentObjects = RetrieveSdkStepsByPluginType( destinationSystem, pluginType );
+            DeleteDependentObjects( destinationSystem, dependentObjects );
         }
 
-        private void DeleteDependentObjects(IOrganizationService service, IEnumerable<Dependency> dependentObjects)
+        private void DeleteDependentObjects( IOrganizationService service, IEnumerable< Dependency > dependentObjects )
         {
-            foreach (var d in dependentObjects)
+            foreach( var d in dependentObjects )
             {
-                if (d.DependentComponentType.Value ==
-                    (int) SolutionComponent.OptionSet.ComponentType.SdkMessageProcessingStep)
+                if( d.DependentComponentType.Value ==
+                    ( int ) SolutionComponent.OptionSet.ComponentType.SdkMessageProcessingStep )
                 {
-                    if (d.DependentComponentObjectId == null)
+                    if( d.DependentComponentObjectId == null )
                     {
                         continue;
                     }
-                    service.Delete(SdkMessageProcessingStep.EntityLogicalName, d.DependentComponentObjectId.Value);
-                    logger.Log( $"SdkMessageProcessingStep '{d.DependentComponentObjectId.Value}' deleted successfully");
+
+                    service.Delete( SdkMessageProcessingStep.EntityLogicalName, d.DependentComponentObjectId.Value );
+                    logger.Log( $"SdkMessageProcessingStep '{d.DependentComponentObjectId.Value}' deleted successfully" );
                 }
                 else
                 {
                     throw new InvalidOperationException(
-                        $"Unknown DependentComponentValue: {d.DependentComponentType.Value}");
+                        $"Unknown DependentComponentValue: {d.DependentComponentType.Value}" );
                 }
             }
         }
@@ -171,71 +184,72 @@ namespace Xrm.PluginDeployer
         /// <summary>
         /// Creates solution with all components of the pluginAssembly in the source system. Then Imports the solution to the destination system
         /// </summary>
-        private void SyncPluginStepsViaSolution(PluginAssembly sourcePluginAssembly, PluginAssembly destPluginAssembly,
-            string publisher)
+        private void SyncPluginStepsViaSolution( PluginAssembly sourcePluginAssembly,
+                                                 PluginAssembly destPluginAssembly,
+                                                 string publisher )
         {
-            var solutions = RetrieveSpecificSolution(sourceSystem).ToList();
-            if (solutions.Any())
+            var solutions = RetrieveSpecificSolution( sourceSystem ).ToList( );
+            if( solutions.Any( ) )
             {
-                DeleteSolution(sourceSystem, solutions.First());
+                DeleteSolution( sourceSystem, solutions.First( ) );
             }
 
-            CreateSolution(sourceSystem, publisher);
+            CreateSolution( sourceSystem, publisher );
 
-            var registeredDestPluginTypes = RetrievePluginTypes(destinationSystem, destPluginAssembly.Id).ToList();
-            var registeredSourcePluginTypes = RetrievePluginTypes(sourceSystem, sourcePluginAssembly.Id).ToList();
+            var registeredDestPluginTypes = RetrievePluginTypes( destinationSystem, destPluginAssembly.Id ).ToList( );
+            var registeredSourcePluginTypes = RetrievePluginTypes( sourceSystem, sourcePluginAssembly.Id ).ToList( );
 
-            var itemsToAddToSolution = new List<PluginType>();
+            var itemsToAddToSolution = new List< PluginType >( );
 
-            registeredDestPluginTypes.ForEach(destType =>
+            registeredDestPluginTypes.ForEach( destType =>
             {
                 var intersectcandidate =
-                    registeredSourcePluginTypes.FirstOrDefault(sourceType => sourceType.TypeName == destType.TypeName);
-                if (intersectcandidate != null)
+                    registeredSourcePluginTypes.FirstOrDefault( sourceType => sourceType.TypeName == destType.TypeName );
+                if( intersectcandidate != null )
                 {
-                    itemsToAddToSolution.Add(intersectcandidate);
+                    itemsToAddToSolution.Add( intersectcandidate );
                 }
-            });
+            } );
 
-            AddItemsToSolution(sourceSystem, itemsToAddToSolution);
+            AddItemsToSolution( sourceSystem, itemsToAddToSolution );
 
-            var solution = ExportSolution(sourceSystem);
-            ImportSolutionInDestination(solution);
+            var solution = ExportSolution( sourceSystem );
+            ImportSolutionInDestination( solution );
         }
 
         /// <summary>
         /// Delete all registered plugintypes+steps and workflows which are not in the assembly anymore
         /// </summary>
         /// <param name="pluginAssembly"></param>
-        private void DeleteOldPluginTypeStepsOfAssembly(PluginAssembly pluginAssembly)
+        private void DeleteOldPluginTypeStepsOfAssembly( PluginAssembly pluginAssembly )
         {
-            if (pluginAssembly == null)
+            if( pluginAssembly == null )
             {
                 return;
             }
 
-            var foundPlugins = SearchForPlugins().ToList();
-            var registeredPluginTypes = RetrievePluginTypes(destinationSystem, pluginAssembly.Id).ToList();
+            var foundPlugins = SearchForPlugins( ).ToList( );
+            var registeredPluginTypes = RetrievePluginTypes( destinationSystem, pluginAssembly.Id ).ToList( );
 
             // Delete old pluginTypes
-            foreach (var pluginType in registeredPluginTypes.Where(pt =>
-                pt.IsWorkflowActivity.HasValue && !pt.IsWorkflowActivity.Value))
+            foreach( var pluginType in registeredPluginTypes.Where( pt =>
+                                                                        pt.IsWorkflowActivity.HasValue && !pt.IsWorkflowActivity.Value ) )
             {
-                if (!foundPlugins.Any(ft => ft.FullName != null && ft.FullName.Equals(pluginType.TypeName)))
+                if( !foundPlugins.Any( ft => ft.FullName != null && ft.FullName.Equals( pluginType.TypeName ) ) )
                 {
-                    DeleteStepsByPluginType(pluginType);
-                    DeletePluginType(pluginType);
+                    DeleteStepsByPluginType( pluginType );
+                    DeletePluginType( pluginType );
                 }
             }
 
-            var foundWorkflows = SearchForWorkflows().ToList();
+            var foundWorkflows = SearchForWorkflows( ).ToList( );
             // Delete old workflows
-            foreach (var pluginType in registeredPluginTypes.Where(pt =>
-                pt.IsWorkflowActivity.HasValue && pt.IsWorkflowActivity.Value))
+            foreach( var pluginType in registeredPluginTypes.Where( pt =>
+                                                                        pt.IsWorkflowActivity.HasValue && pt.IsWorkflowActivity.Value ) )
             {
-                if (!foundWorkflows.Any(ft => ft.FullName != null && ft.FullName.Equals(pluginType.TypeName)))
+                if( !foundWorkflows.Any( ft => ft.FullName != null && ft.FullName.Equals( pluginType.TypeName ) ) )
                 {
-                    DeletePluginType(pluginType);
+                    DeletePluginType( pluginType );
                 }
             }
         }
@@ -245,33 +259,33 @@ namespace Xrm.PluginDeployer
         /// Delete all registered plugintypes+steps and workflows which are not in the assembly anymore
         /// </summary>
         /// <param name="pluginAssembly"></param>
-        private void DeleteAllPluginTypeStepsOfAssembly(PluginAssembly pluginAssembly)
+        private void DeleteAllPluginTypeStepsOfAssembly( PluginAssembly pluginAssembly )
         {
-            if (pluginAssembly == null)
+            if( pluginAssembly == null )
             {
                 return;
             }
 
-            var registeredPluginTypes = RetrievePluginTypes(destinationSystem, pluginAssembly.Id).ToList();
+            var registeredPluginTypes = RetrievePluginTypes( destinationSystem, pluginAssembly.Id ).ToList( );
 
             // Delete old pluginTypes
-            foreach (var pluginType in registeredPluginTypes.Where(pt =>
-                pt.IsWorkflowActivity.HasValue && !pt.IsWorkflowActivity.Value))
+            foreach( var pluginType in registeredPluginTypes.Where( pt =>
+                                                                        pt.IsWorkflowActivity.HasValue && !pt.IsWorkflowActivity.Value ) )
             {
-                DeleteStepsByPluginType(pluginType);
-                DeletePluginType(pluginType);
+                DeleteStepsByPluginType( pluginType );
+                DeletePluginType( pluginType );
             }
 
             // Delete old workflows
-            foreach (var pluginType in registeredPluginTypes.Where(pt =>
-                pt.IsWorkflowActivity.HasValue && pt.IsWorkflowActivity.Value))
+            foreach( var pluginType in registeredPluginTypes.Where( pt =>
+                                                                        pt.IsWorkflowActivity.HasValue && pt.IsWorkflowActivity.Value ) )
             {
-                DeletePluginType(pluginType);
+                DeletePluginType( pluginType );
             }
         }
 
 
-        private void UpdatePluginAssembly(IOrganizationService service, PluginAssembly pluginAssembly, string content)
+        private void UpdatePluginAssembly( IOrganizationService service, PluginAssembly pluginAssembly, string content )
         {
             var updatedAssembly = new PluginAssembly
             {
@@ -280,7 +294,7 @@ namespace Xrm.PluginDeployer
                 Content = content
             };
 
-            service.Update(updatedAssembly);
+            service.Update( updatedAssembly );
 
             // Necessary because otherwise further steps will fail, because the new plugin content is not 
             // properly loaded in the system.
@@ -288,28 +302,29 @@ namespace Xrm.PluginDeployer
             var count = 10;
             do
             {
-                Thread.Sleep(100);
-                newPluginAssembly = service.Retrieve(PluginAssembly.EntityLogicalName,
-                    pluginAssembly.Id,
-                    new ColumnSet(PluginAssembly.PropertyNames.VersionNumber)).ToEntity<PluginAssembly>();
+                Thread.Sleep( 100 );
+                newPluginAssembly = service.Retrieve( PluginAssembly.EntityLogicalName,
+                                                      pluginAssembly.Id,
+                                                      new ColumnSet( PluginAssembly.PropertyNames.VersionNumber ) ).ToEntity< PluginAssembly >( );
                 count--;
                 logger.Log(
-                    $"Count: {count}, Old VersionNumber: {pluginAssembly.VersionNumber}, New VersionNumber: {newPluginAssembly.VersionNumber}");
-            } while (pluginAssembly.VersionNumber == newPluginAssembly.VersionNumber && count >= 0);
+                    $"Count: {count}, Old VersionNumber: {pluginAssembly.VersionNumber}, New VersionNumber: {newPluginAssembly.VersionNumber}" );
+            }
+            while( pluginAssembly.VersionNumber == newPluginAssembly.VersionNumber && count >= 0 );
 
-            logger.Log("Successfully updated PluginAssembly");
+            logger.Log( "Successfully updated PluginAssembly" );
         }
 
         /// <summary>
         /// Find all classes of the assembly via reflection which implement the interface IPlugin
         /// </summary>
         /// <returns></returns>
-        private IEnumerable<Type> SearchForPlugins()
+        private IEnumerable< Type > SearchForPlugins( )
         {
             return AssemblyPlugin.ExportedTypes.Where(
                 t => t.IsClass
-                     && !t.IsAbstract
-                     && t.GetInterface(typeof(IPlugin).FullName) != null
+                    && !t.IsAbstract
+                    && t.GetInterface( typeof( IPlugin ).FullName ) != null
             );
         }
 
@@ -317,107 +332,107 @@ namespace Xrm.PluginDeployer
         /// Find all classes of the assembly via reflection which directly inherit from CodeActivity
         /// </summary>
         /// <returns></returns>
-        private IEnumerable<Type> SearchForWorkflows()
+        private IEnumerable< Type > SearchForWorkflows( )
         {
             return AssemblyPlugin.ExportedTypes.Where(
                 t => t.IsClass
-                     && !t.IsAbstract
-                     && t.BaseType == typeof(CodeActivity)
+                    && !t.IsAbstract
+                    && t.BaseType == typeof( CodeActivity )
             );
         }
 
-        private PluginAssembly CreatePluginAssembly(IOrganizationService service, Assembly assembly, string content)
+        private PluginAssembly CreatePluginAssembly( IOrganizationService service, Assembly assembly, string content )
         {
-            var bytes = assembly.GetName().GetPublicKeyToken();
-            var publicKeyToken = BitConverter.ToString(bytes).Replace("-", "");
+            var bytes = assembly.GetName( ).GetPublicKeyToken( );
+            var publicKeyToken = BitConverter.ToString( bytes ).Replace( "-", "" );
 
             var pluginAssembly = new PluginAssembly
             {
                 LogicalName = PluginAssembly.EntityLogicalName,
                 Content = content,
-                Name = assembly.GetName().Name,
-                Culture = assembly.GetName().CultureName,
-                Version = assembly.GetName().Version.ToString(),
+                Name = assembly.GetName( ).Name,
+                Culture = assembly.GetName( ).CultureName,
+                Version = assembly.GetName( ).Version.ToString( ),
                 PublicKeyToken = publicKeyToken,
-                SourceType = new OptionSetValue((int) PluginAssembly.OptionSet.SourceType.Database),
-                IsolationMode = new OptionSetValue((int) PluginAssembly.OptionSet.IsolationMode.None)
+                SourceType = new OptionSetValue( ( int ) PluginAssembly.OptionSet.SourceType.Database ),
+                IsolationMode = new OptionSetValue( ( int ) PluginAssembly.OptionSet.IsolationMode.None )
             };
 
-            var id = service.Create(pluginAssembly);
+            var id = service.Create( pluginAssembly );
 
-            logger.Log($"Successfully created PluginAssembly '{assembly.GetName().Name}' with id {id}");
+            logger.Log( $"Successfully created PluginAssembly '{assembly.GetName( ).Name}' with id {id}" );
 
             pluginAssembly.Id = id;
             return pluginAssembly;
         }
 
-        private void CreatePluginType(IOrganizationService service, Guid pluginAssemblyId, Type type)
+        private void CreatePluginType( IOrganizationService service, Guid pluginAssemblyId, Type type )
         {
-            var pluginType = CreatePluginTypeEntity(pluginAssemblyId, type);
-            var id = service.Create(pluginType);
+            var pluginType = CreatePluginTypeEntity( pluginAssemblyId, type );
+            var id = service.Create( pluginType );
 
-            logger.Log($"Successfully created PluginType '{type.FullName}' with id {id}");
+            logger.Log( $"Successfully created PluginType '{type.FullName}' with id {id}" );
         }
 
-        private void UpdatePluginType(IOrganizationService service, PluginType existingPluginType, Type type)
+        private void UpdatePluginType( IOrganizationService service, PluginType existingPluginType, Type type )
         {
-            var description = GetDescription(type);
+            var description = GetDescription( type );
 
-            if (existingPluginType.Description == description) return;
+            if( existingPluginType.Description == description ) return;
 
             var updatePluginType = new PluginType
             {
                 Id = existingPluginType.Id,
                 Description = description
             };
-            service.Update(updatePluginType);
+            service.Update( updatePluginType );
         }
 
-        private PluginType CreatePluginTypeEntity(Guid pluginAssemblyId, Type type)
+        private PluginType CreatePluginTypeEntity( Guid pluginAssemblyId, Type type )
         {
-            var description = GetDescription(type);
+            var description = GetDescription( type );
 
             var pluginType = new PluginType
             {
                 LogicalName = PluginType.EntityLogicalName,
-                PluginAssemblyId = new EntityReference(PluginAssembly.EntityLogicalName, pluginAssemblyId),
+                PluginAssemblyId = new EntityReference( PluginAssembly.EntityLogicalName, pluginAssemblyId ),
                 TypeName = type.FullName,
-                FriendlyName = Guid.NewGuid().ToString(),
+                FriendlyName = Guid.NewGuid( ).ToString( ),
                 Name = type.FullName,
                 Description = description
             };
             return pluginType;
         }
 
-        private string GetDescription(Type type)
+        private string GetDescription( Type type )
         {
             var descriptionNode =
-                CommentXml.SelectSingleNode($"doc/members/member[@name=\"T:{type.FullName}\"]/summary");
+                CommentXml.SelectSingleNode( $"doc/members/member[@name=\"T:{type.FullName}\"]/summary" );
             var description = "No description";
 
-            if (descriptionNode != null)
+            if( descriptionNode != null )
             {
-                description = descriptionNode.InnerText.Trim( ' ', '\r', '\n').Replace("\r\n            ", " " );
-                if (description.Length > 256) description = description.Substring(0, 256);
+                description = descriptionNode.InnerText.Trim( ' ', '\r', '\n' ).Replace( "\r\n            ", " " );
+                if( description.Length > 256 ) description = description.Substring( 0, 256 );
             }
 
             return description;
         }
 
-        private void DeletePluginType(PluginType pluginType)
+        private void DeletePluginType( PluginType pluginType )
         {
-            destinationSystem.Delete(PluginType.EntityLogicalName, pluginType.Id);
-            logger.Log($"Successfully deleted PluginType '{pluginType.TypeName}'");
+            destinationSystem.Delete( PluginType.EntityLogicalName, pluginType.Id );
+            logger.Log( $"Successfully deleted PluginType '{pluginType.TypeName}'" );
         }
 
-        private void DeleteSolution(IOrganizationService service, Solution solution)
+        private void DeleteSolution( IOrganizationService service, Solution solution )
         {
-            service.Delete("solution", solution.Id);
+            service.Delete( "solution", solution.Id );
 
-            logger.Log($"Successfully deleted Solution '{solution.UniqueName}'");
+            logger.Log( $"Successfully deleted Solution '{solution.UniqueName}'" );
         }
 
-        private void CreateSolution(IOrganizationService service, string publisher)
+        private void CreateSolution( IOrganizationService service, string publisher )
         {
             var solution = new Solution
             {
@@ -425,15 +440,15 @@ namespace Xrm.PluginDeployer
                 FriendlyName = SolutionName,
                 UniqueName = SolutionName,
                 Version = "1.0.0.0",
-                PublisherId = RetrievePublisher(service, publisher).ToEntityReference()
+                PublisherId = RetrievePublisher( service, publisher ).ToEntityReference( )
             };
 
-            var id = service.Create(solution);
+            var id = service.Create( solution );
 
-            logger.Log($"Successfully created Solution '{solution.UniqueName}' with id {id}");
+            logger.Log( $"Successfully created Solution '{solution.UniqueName}' with id {id}" );
         }
 
-        private void AddItemsToSolution(IOrganizationService service, List<PluginType> pluginTypes)
+        private void AddItemsToSolution( IOrganizationService service, List< PluginType > pluginTypes )
         {
             var executeMultipleRequest =
                 new ExecuteMultipleRequest
@@ -444,55 +459,55 @@ namespace Xrm.PluginDeployer
                         // We don't need responses for succeeded requests, failed requests always return responses
                         ReturnResponses = false
                     },
-                    Requests = new OrganizationRequestCollection()
+                    Requests = new OrganizationRequestCollection( )
                 };
 
-            pluginTypes.ForEach(pluginType =>
+            pluginTypes.ForEach( pluginType =>
                 {
-                    foreach (var d in RetrieveSdkStepsByPluginType(service, pluginType))
+                    foreach( var d in RetrieveSdkStepsByPluginType( service, pluginType ) )
                     {
-                        if (d.DependentComponentType.Value ==
-                            (int) SolutionComponent.OptionSet.ComponentType.SdkMessageProcessingStep
+                        if( d.DependentComponentType.Value ==
+                            ( int ) SolutionComponent.OptionSet.ComponentType.SdkMessageProcessingStep
                             || d.DependentComponentType.Value ==
-                            (int) SolutionComponent.OptionSet.ComponentType.Workflow)
+                            ( int ) SolutionComponent.OptionSet.ComponentType.Workflow )
                         {
-                            if (d.DependentComponentObjectId != null)
-                                executeMultipleRequest.Requests.Add(new AddSolutionComponentRequest
+                            if( d.DependentComponentObjectId != null )
+                                executeMultipleRequest.Requests.Add( new AddSolutionComponentRequest
                                 {
                                     AddRequiredComponents = false,
                                     ComponentId = d.DependentComponentObjectId.Value,
                                     ComponentType = d.DependentComponentType.Value,
                                     SolutionUniqueName = SolutionName
-                                });
-                            executeMultipleRequest.Requests.AddRange(RetrieveDependentComponents(service, d));
+                                } );
+                            executeMultipleRequest.Requests.AddRange( RetrieveDependentComponents( service, d ) );
                         }
                         else
                         {
                             throw new InvalidOperationException(
-                                $"Unknown DependentComponentValue: {d.DependentComponentType.Value}");
+                                $"Unknown DependentComponentValue: {d.DependentComponentType.Value}" );
                         }
                     }
                 }
             );
 
-            if (!executeMultipleRequest.Requests.Any()) return;
+            if( !executeMultipleRequest.Requests.Any( ) ) return;
 
-            var executeMultipleResponse = (ExecuteMultipleResponse) service.Execute(executeMultipleRequest);
-            if (executeMultipleResponse.IsFaulted)
+            var executeMultipleResponse = ( ExecuteMultipleResponse ) service.Execute( executeMultipleRequest );
+            if( executeMultipleResponse.IsFaulted )
             {
                 var errorMessages = executeMultipleResponse.Responses
-                    .Where(r => r.Fault != null)
-                    .Select(r => r.Fault.Message);
+                    .Where( r => r.Fault != null )
+                    .Select( r => r.Fault.Message );
 
-                logger.Error($"Errors occured:\n{string.Join(Environment.NewLine, errorMessages)}");
+                logger.Error( $"Errors occured:\n{string.Join( Environment.NewLine, errorMessages )}" );
             }
             else
             {
-                logger.Log($"Successfully added {executeMultipleRequest.Requests.Count} components to solution");
+                logger.Log( $"Successfully added {executeMultipleRequest.Requests.Count} components to solution" );
             }
         }
 
-        private byte[] ExportSolution(IOrganizationService service)
+        private byte[] ExportSolution( IOrganizationService service )
         {
             var exportSolutionRequest = new ExportSolutionRequest
             {
@@ -500,12 +515,12 @@ namespace Xrm.PluginDeployer
                 SolutionName = SolutionName
             };
 
-            var result = (ExportSolutionResponse) service.Execute(exportSolutionRequest);
+            var result = ( ExportSolutionResponse ) service.Execute( exportSolutionRequest );
 
             return result.ExportSolutionFile;
         }
 
-        private void ImportSolutionInDestination(byte[] solutionContent)
+        private void ImportSolutionInDestination( byte[] solutionContent )
         {
             var importSolutionRequest = new ImportSolutionRequest
             {
@@ -513,7 +528,7 @@ namespace Xrm.PluginDeployer
                 PublishWorkflows = true
             };
 
-            destinationSystem.Execute(importSolutionRequest);
+            destinationSystem.Execute( importSolutionRequest );
         }
 
 
@@ -523,55 +538,50 @@ namespace Xrm.PluginDeployer
         /// </summary>
         /// <param name="parsedArgs"></param>
         /// <param name="destPluginAssembly"></param>
-        public void UpdateSystem(CmdArgs parsedArgs, PluginAssembly destPluginAssembly)
+        public void UpdateSystem( CmdArgs parsedArgs, PluginAssembly destPluginAssembly )
         {
-            if (!parsedArgs.Sync)
+            if( !parsedArgs.Sync )
             {
                 try
                 {
-                    // BEWARE of correct sorting!!!
                     // Update Assembly
-                    destPluginAssembly = UploadPluginAssemblyToDestination(destPluginAssembly);
+                    destPluginAssembly = UploadPluginAssemblyToDestination( destPluginAssembly );
                     // Create NEW PluginTypes/Workflows
-                    CreateNewPluginTypesInDestination(destPluginAssembly);
+                    CreateNewPluginTypesInDestination( destPluginAssembly );
                 }
-                catch (Exception exception)
+                catch( Exception exception )
                 {
-                    logger.Error("Exception on Update of Assembly occured:\n", exception);
+                    logger.Error( "Exception on Update of Assembly occured:\n", exception );
                     logger.Error(
-                        "Your Assembly differs from Assembly on Destination-System: PluginTypes or Steps do not fit. Please contact colleagues or try Sync Option");
+                        "Your Assembly differs from Assembly on Destination-System: PluginTypes or Steps do not fit. Please contact colleagues or try Sync Option" );
                 }
             }
             else
             {
-                if (parsedArgs.SourceSystem == null)
+                if( parsedArgs.SourceSystem == null )
                 {
-                    // BEWARE of correct sorting!!!
-                    // Assembly Update or Create + Deletion of old PluginSteps and PluginTypes
-                    // Delete old PluginTypes and Steps
-                    DeleteOldPluginTypeStepsOfAssembly(destPluginAssembly);
+                    // Deletion of old PluginSteps and PluginTypes
+                    DeleteOldPluginTypeStepsOfAssembly( destPluginAssembly );
                     // Assembly Update
-                    destPluginAssembly = UploadPluginAssemblyToDestination(destPluginAssembly);
+                    destPluginAssembly = UploadPluginAssemblyToDestination( destPluginAssembly );
                     // Create NEW PluginTypes/Workflows
-                    CreateNewPluginTypesInDestination(destPluginAssembly);
+                    CreateNewPluginTypesInDestination( destPluginAssembly );
                 }
                 else
                 {
-                    var sourcePluginAssembly = RetrievePluginAssembly(sourceSystem, AssemblyPlugin.GetName().Name);
+                    var sourcePluginAssembly = RetrievePluginAssembly( sourceSystem, AssemblyPlugin.GetName( ).Name );
 
-                    // BEWARE of correct sorting!!!
-                    // Assembly Update + Deletion of all PluginSteps and PluginTypes + Transfer Solution
-                    logger.Log($"SourceSystem is \'{parsedArgs.SourceSystem}\'");
+                    logger.Log( $"SourceSystem is \'{parsedArgs.SourceSystem}\'" );
                     // Delete all Steps in Destination
-                    DeleteOldPluginTypeStepsOfAssembly(destPluginAssembly);
+                    DeleteOldPluginTypeStepsOfAssembly( destPluginAssembly );
                     // Assembly Update or Create
-                    destPluginAssembly = UploadPluginAssemblyToDestination(destPluginAssembly);
+                    destPluginAssembly = UploadPluginAssemblyToDestination( destPluginAssembly );
                     // Create NEW PluginTypes/Workflows
-                    CreateNewPluginTypesInDestination(destPluginAssembly);
+                    CreateNewPluginTypesInDestination( destPluginAssembly );
                     // Sync Steps from Source to Destination
-                    SyncPluginStepsViaSolution(sourcePluginAssembly, destPluginAssembly, parsedArgs.Publisher);
+                    SyncPluginStepsViaSolution( sourcePluginAssembly, destPluginAssembly, parsedArgs.Publisher );
 
-                    logger.Log("Successfully imported solution");
+                    logger.Log( "Successfully imported solution" );
                 }
             }
         }
@@ -582,148 +592,140 @@ namespace Xrm.PluginDeployer
         /// </summary>
         /// <param name="parsedArgs"></param>
         /// <param name="destPluginAssembly"></param>
-        public void CreateFromScratch(CmdArgs parsedArgs, PluginAssembly destPluginAssembly)
+        public void CreateFromScratch( CmdArgs parsedArgs, PluginAssembly destPluginAssembly )
         {
-            var uow = new EntityExtenions.CrmUnitOfWork(destinationSystem);
+            var uow = new CrmUnitOfWork( destinationSystem );
 
             // Delete destination assembly
-            DeleteAllPluginTypeStepsOfAssembly(destPluginAssembly);
+            DeleteAllPluginTypeStepsOfAssembly( destPluginAssembly );
 
             // Create / Update assembly
-            destPluginAssembly = UploadPluginAssemblyToDestination(destPluginAssembly);
+            destPluginAssembly = UploadPluginAssemblyToDestination( destPluginAssembly );
 
             // Create NEW PluginTypes/Workflows
-            CreateNewPluginTypesInDestination(destPluginAssembly);
+            CreateNewPluginTypesInDestination( destPluginAssembly );
 
             // Create Steps
-            var file = new FileInfo(parsedArgs.AssemblyPath);
-            var assemblyName = file.Name.Substring(0, file.Name.Length - 4);
+            var file = new FileInfo( parsedArgs.AssemblyPath );
+            var assemblyName = file.Name.Substring( 0, file.Name.Length - 4 );
 
-            var plugin = (from pl in uow.PluginAssemblies.GetQuery()
+            var plugin = ( from pl in uow.PluginAssemblies.GetQuery( )
                 where pl.Name == assemblyName
-                select pl).SingleOrDefault();
+                select pl ).SingleOrDefault( );
 
-            var steps = (from st in uow.SdkMessageProcessingSteps.GetQuery()
-                join pt in uow.PluginTypes.GetQuery() on st.EventHandler.Id equals pt.PluginTypeId
+            var steps = ( from st in uow.SdkMessageProcessingSteps.GetQuery( )
+                join pt in uow.PluginTypes.GetQuery( ) on st.EventHandler.Id equals pt.PluginTypeId
                 where pt.PluginAssemblyId.Id == plugin.PluginAssemblyId
-                select st).ToArray().ToDictionary(s => s.UniqueName);
+                select st ).ToArray( ).ToDictionary( s => s.UniqueName );
 
-            var stepsToCreate = CreateStepsModel(assemblyName);
-            CreateSteps(uow, plugin, steps, stepsToCreate);
+            var stepsToCreate = CreateStepsModel( assemblyName );
+            CreateSteps( uow, plugin, steps, stepsToCreate );
 
             // Create Images
-            var allImages = (from im in uow.SdkMessageProcessingStepImages.GetQuery()
-                join st in uow.SdkMessageProcessingSteps.GetQuery() on im.SdkMessageProcessingStepId.Id equals st
+            var allImages = ( from im in uow.SdkMessageProcessingStepImages.GetQuery( )
+                join st in uow.SdkMessageProcessingSteps.GetQuery( ) on im.SdkMessageProcessingStepId.Id equals st
                     .SdkMessageProcessingStepId
-                join pl in uow.PluginTypes.GetQuery() on st.EventHandler.Id equals pl.PluginTypeId
+                join pl in uow.PluginTypes.GetQuery( ) on st.EventHandler.Id equals pl.PluginTypeId
                 where pl.PluginAssemblyId.Id == plugin.PluginAssemblyId
-                      && (im.Name == "preImage" || im.Name == "postImage")
-                select im).ToArray();
+                select im ).ToArray( );
 
-            var preImages = (from s in stepsToCreate where s.PreImage select s).ToArray();
-            var postImages = (from s in stepsToCreate where s.PostImage select s).ToArray();
+            var preImages = ( from s in stepsToCreate where s.PreImage select s ).ToArray( );
+            var postImages = ( from s in stepsToCreate where s.PostImage select s ).ToArray( );
 
-            CreatePreImages(uow, preImages, allImages, steps);
-            CreatePostImages(uow, postImages, allImages, steps);
+            CreatePreImages( uow, preImages, allImages, steps );
+            CreatePostImages( uow, postImages, allImages, steps );
 
             logger.Log(
-                $"Successfully created steps and images of Plugin {AssemblyPlugin.GetName().Name} in {destinationSystem}.");
+                $"Successfully created steps and images of Plugin {AssemblyPlugin.GetName( ).Name} in {destinationSystem}." );
         }
 
-        private List<Model.Step> CreateStepsModel(string assemblyName)
+        private List< Step > CreateStepsModel( string assemblyName )
         {
             var ns = assemblyName + ".Attributes.";
-            var stepAttributeType = AssemblyPlugin.GetType(ns + "StepAttribute");
+            var stepAttributeType = AssemblyPlugin.GetType( ns + "StepAttribute" );
 
-            var pluginType = typeof(IPlugin);
-            var classes = (from cl in AssemblyPlugin.GetTypes()
-                where pluginType.IsAssignableFrom(cl) && !cl.IsAbstract
-                select cl).ToList();
+            var pluginType = typeof( IPlugin );
+            var classes = ( from cl in AssemblyPlugin.GetTypes( )
+                where pluginType.IsAssignableFrom( cl ) && !cl.IsAbstract
+                select cl ).ToList( );
 
-            var stepsToCreate = new List<Model.Step>();
-            classes.ForEach(cl =>
+            var stepsToCreate = new List< Step >( );
+            classes.ForEach( cl =>
             {
-                var assmSteps = cl.GetCustomAttributes(stepAttributeType, false).ToArray();
+                var assmSteps = cl.GetCustomAttributes( stepAttributeType, false ).ToArray( );
 
-                if (assmSteps.Length > 0)
+                if( assmSteps.Length > 0 )
                 {
-                    foreach (var assStep in assmSteps)
+                    foreach( var assStep in assmSteps )
                     {
-                        var stepToCreate = new Model.Step
+                        var stepToCreate = new Step
                         {
-                            Class = cl,
-                            EventType = (Model.CrmEventType) Enum.Parse(
-                                typeof(Model.CrmEventType),
-                                stepAttributeType.GetProperty("EventType").GetValue(assStep).ToString()),
-                            ExecutionOrder = (int) stepAttributeType.GetProperty("ExecutionOrder").GetValue(assStep),
-                            FilteringAttributes =
-                                (string[]) stepAttributeType.GetProperty("FilteringAttributes").GetValue(assStep),
-                            PreImage = (bool) stepAttributeType.GetProperty("Preimage").GetValue(assStep),
-                            PreImageAttributes =
-                                (string[]) stepAttributeType.GetProperty("PreimageAttributes").GetValue(assStep),
-                            PrimaryEntity = (string) stepAttributeType.GetProperty("PrimaryEntity").GetValue(assStep),
-                            SecondaryEntity =
-                                (string) stepAttributeType.GetProperty("SecondaryEntity").GetValue(assStep),
-                            Solution = new Model.Solution {Name = SolutionName},
-                            Stage = (Model.StageEnum) Enum.Parse(
-                                typeof(Model.StageEnum),
-                                stepAttributeType.GetProperty("Stage").GetValue(assStep).ToString()),
-                            Offline = (bool) stepAttributeType.GetProperty("Offline").GetValue(assStep)
+                            Class = cl, EventType = ( CrmEventType ) Enum.Parse( typeof( CrmEventType ), stepAttributeType.GetProperty( nameof(Step.EventType) ).GetValue( assStep ).ToString( ) ),
+                            ExecutionOrder = ( int ) stepAttributeType.GetProperty( nameof(Step.ExecutionOrder) ).GetValue( assStep ),
+                            FilteringAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.FilteringAttributes) ).GetValue( assStep ),
+                            PreImage = ( bool ) stepAttributeType.GetProperty( nameof(Step.PreImage) ).GetValue( assStep ),
+                            PostImage = ( bool ) stepAttributeType.GetProperty( nameof(Step.PostImage) ).GetValue( assStep ),
+                            ImageName = ( string ) stepAttributeType.GetProperty( nameof(Step.ImageName) ).GetValue( assStep ),
+                            ImageAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.ImageAttributes) ).GetValue( assStep ),
+                            PrimaryEntity = ( string ) stepAttributeType.GetProperty( nameof(Step.PrimaryEntity) ).GetValue( assStep ),
+                            SecondaryEntity = ( string ) stepAttributeType.GetProperty( nameof(Step.SecondaryEntity) ).GetValue( assStep ),
+                            Offline = ( bool ) stepAttributeType.GetProperty( nameof(Step.Offline) ).GetValue( assStep )
                         };
 
-                        if (stepToCreate.ExecutionOrder == 0)
+                        if( stepToCreate.ExecutionOrder == 0 )
                         {
                             stepToCreate.ExecutionOrder = 1;
                         }
 
-                        stepsToCreate.Add(stepToCreate);
+                        stepsToCreate.Add( stepToCreate );
                     }
                 }
                 else
                 {
-                    logger.Error(cl.FullName + " is missing step or solution");
+                    logger.Error( cl.FullName + " is missing step or solution" );
                 }
-            });
+            } );
             return stepsToCreate;
         }
 
-        private void CreateSteps(EntityExtenions.CrmUnitOfWork uow, PluginAssembly plugin,
-            Dictionary<string, SdkMessageProcessingStep> steps, List<Model.Step> stepsToCreate)
+        private void CreateSteps( UnitOfWork uow,
+                                  PluginAssembly plugin,
+                                  IDictionary< string, SdkMessageProcessingStep > steps,
+                                  IReadOnlyCollection< Step > stepsToCreate )
         {
-            var pluginTypes = (from pl in uow.PluginTypes.GetQuery()
+            var pluginTypes = ( from pl in uow.PluginTypes.GetQuery( )
                 where pl.PluginAssemblyId.Id == plugin.PluginAssemblyId
-                select pl).ToArray().ToDictionary(t => t.TypeName);
-
-            #region Create Steps
-
-            var sdkMessageIndex = (from s in uow.SdkMessages.GetQuery() select s).ToArray().ToDictionary(s => s.Name);
+                select pl ).ToArray( ).ToDictionary( t => t.TypeName );
 
 
+            var sdkMessageIndex = ( from s in uow.SdkMessages.GetQuery( ) select s ).ToArray( ).ToDictionary( s => s.Name );
 
-            foreach (var step in stepsToCreate)
+
+
+            foreach( var step in stepsToCreate )
             {
-                var sdkMessage = sdkMessageIndex[step.EventType.ToString()];
+                var sdkMessage = sdkMessageIndex[ step.EventType.ToString( ) ];
 
                 SdkMessageFilter filter;
 
-                if (string.IsNullOrEmpty(step.SecondaryEntity))
+                if( string.IsNullOrEmpty( step.SecondaryEntity ) )
                 {
-                    filter = (from f in uow.SdkMessageFilters.GetQuery()
+                    filter = ( from f in uow.SdkMessageFilters.GetQuery( )
                         where f.SdkMessageId.Id == sdkMessage.SdkMessageId
-                              && f.PrimaryObjectTypeCode == step.PrimaryEntity
-                        select f).SingleOrDefault();
+                            && f.PrimaryObjectTypeCode == step.PrimaryEntity
+                        select f ).SingleOrDefault( );
                 }
                 else
                 {
-                    filter = (from f in uow.SdkMessageFilters.GetQuery()
+                    filter = ( from f in uow.SdkMessageFilters.GetQuery( )
                         where f.SdkMessageId.Id == sdkMessage.SdkMessageId
-                              && f.PrimaryObjectTypeCode == step.PrimaryEntity
-                              && f.SecondaryObjectTypeCode == step.SecondaryEntity
-                        select f).SingleOrDefault();
+                            && f.PrimaryObjectTypeCode == step.PrimaryEntity
+                            && f.SecondaryObjectTypeCode == step.SecondaryEntity
+                        select f ).SingleOrDefault( );
                 }
 
                 var deployment = 0;
-                if (step.Offline)
+                if( step.Offline )
                 {
                     deployment = 2;
                 }
@@ -731,182 +733,182 @@ namespace Xrm.PluginDeployer
 
                 var newStep = new SdkMessageProcessingStep
                 {
-                    SdkMessageProcessingStepId = Guid.NewGuid(),
+                    SdkMessageProcessingStepId = Guid.NewGuid( ),
                     Name = step.Name,
-                    Mode = new OptionSetValue(step.Async),
+                    Mode = new OptionSetValue( step.Async ),
                     Rank = step.ExecutionOrder,
-                    Stage = new OptionSetValue(step.StageValue),
-                    SupportedDeployment = new OptionSetValue(deployment),
-                    EventHandler = pluginTypes[step.Class.FullName].ToEntityReference(),
-                    SdkMessageId = sdkMessageIndex[step.EventType.ToString()].ToEntityReference(),
-                    SdkMessageFilterId = filter?.ToEntityReference(),
+                    Stage = new OptionSetValue( step.StageValue ),
+                    SupportedDeployment = new OptionSetValue( deployment ),
+                    EventHandler = pluginTypes[ step.Class.FullName ].ToEntityReference( ),
+                    SdkMessageId = sdkMessageIndex[ step.EventType.ToString( ) ].ToEntityReference( ),
+                    SdkMessageFilterId = filter?.ToEntityReference( ),
                 };
 
-                if (step.Stage == Model.StageEnum.PostOperationAsyncWithDelete)
+                if( step.Stage == StageEnum.PostOperationAsyncWithDelete )
                 {
                     newStep.AsyncAutoDelete = true;
                 }
 
 
-                uow.Create(newStep);
-                steps.Add(newStep.UniqueName, newStep);
-                logger.Log("Added step: " + newStep.Name);
+                uow.Create( newStep );
+                steps.Add( newStep.UniqueName, newStep );
+                logger.Log( "Added step: " + newStep.Name );
             }
 
-            var edits = (from s in stepsToCreate where steps.ContainsKey(s.UniqueName) select s).ToArray();
-            foreach (var edit in edits)
+            var edits = ( from s in stepsToCreate where steps.ContainsKey( s.UniqueName ) select s ).ToArray( );
+            foreach( var edit in edits )
             {
-                var step = steps[edit.UniqueName];
+                var step = steps[ edit.UniqueName ];
                 var deployment = 0;
 
-                if (edit.Offline)
+                if( edit.Offline )
                 {
                     deployment = 2;
                 }
 
-                if (step.SupportedDeployment.Value != deployment)
+                if( step.SupportedDeployment.Value != deployment )
                 {
-                    var clean = uow.SdkMessageProcessingSteps.Clean(step);
-                    clean.SupportedDeployment = new OptionSetValue(deployment);
-                    uow.Update(clean);
-                    Console.WriteLine("Changed supported deployment for " + edit.Name + " > " + deployment);
+                    var clean = uow.SdkMessageProcessingSteps.Clean( step );
+                    clean.SupportedDeployment = new OptionSetValue( deployment );
+                    uow.Update( clean );
+                    Console.WriteLine( "Changed supported deployment for " + edit.Name + " > " + deployment );
                 }
 
-                if (edit.Stage == Model.StageEnum.PostOperationAsyncWithDelete &&
-                    !(step.AsyncAutoDelete ?? false))
+                if( edit.Stage == StageEnum.PostOperationAsyncWithDelete &&
+                    !( step.AsyncAutoDelete ?? false ) )
                 {
-                    var clean = uow.SdkMessageProcessingSteps.Clean(step);
+                    var clean = uow.SdkMessageProcessingSteps.Clean( step );
                     clean.AsyncAutoDelete = true;
-                    uow.Update(clean);
-                    Console.WriteLine("Changed async delete policy deployment for " + edit.Name + " > " + deployment);
+                    uow.Update( clean );
+                    Console.WriteLine( "Changed async delete policy deployment for " + edit.Name + " > " + deployment );
                 }
 
-                if (edit.Stage == Model.StageEnum.PostOperationAsyncWithoutDelete &&
-                    (step.AsyncAutoDelete ?? false))
+                if( edit.Stage == StageEnum.PostOperationAsyncWithoutDelete &&
+                    ( step.AsyncAutoDelete ?? false ) )
                 {
-                    var clean = uow.SdkMessageProcessingSteps.Clean(step);
+                    var clean = uow.SdkMessageProcessingSteps.Clean( step );
                     clean.AsyncAutoDelete = false;
-                    uow.Update(clean);
-                    Console.WriteLine("Changed async deployment for " + edit.Name + " > " + deployment);
+                    uow.Update( clean );
+                    Console.WriteLine( "Changed async deployment for " + edit.Name + " > " + deployment );
                 }
             }
-
-            #endregion
         }
 
 
-        private static void CreatePreImages(EntityExtenions.CrmUnitOfWork uow,
-            Model.Step[] preImages, SdkMessageProcessingStepImage[] allImages,
-            Dictionary<string, SdkMessageProcessingStep> stepindex)
+        private static void CreatePreImages( UnitOfWork uow,
+                                             Step[] preImages,
+                                             SdkMessageProcessingStepImage[] allImages,
+                                             IReadOnlyDictionary< string, SdkMessageProcessingStep > stepindex )
         {
-            foreach (var preImage in preImages)
+            foreach( var preImage in preImages )
             {
-                var xrmStep = stepindex[preImage.UniqueName];
-                var image = (from im in allImages
+                var xrmStep = stepindex[ preImage.UniqueName ];
+                var image = ( from im in allImages
                     where xrmStep.SdkMessageProcessingStepId != null && im.SdkMessageProcessingStepId.Id == xrmStep.SdkMessageProcessingStepId.Value && im.Name == "preImage"
-                    select im).SingleOrDefault();
-                if (image == null)
+                    select im ).SingleOrDefault( );
+                if( image == null )
                 {
                     image = new SdkMessageProcessingStepImage
                     {
-                        SdkMessageProcessingStepImageId = Guid.NewGuid(),
-                        SdkMessageProcessingStepId = xrmStep.ToEntityReference(),
-                        Name = "preImage",
-                        EntityAlias = "preImage",
+                        SdkMessageProcessingStepImageId = Guid.NewGuid( ),
+                        SdkMessageProcessingStepId = xrmStep.ToEntityReference( ),
+                        Name = preImage.ImageName,
+                        EntityAlias = preImage.ImageName,
                         MessagePropertyName = preImage.MessagePropertyName,
-                        ImageType = new OptionSetValue(0),
-                        Description = "preImage",
+                        ImageType = new OptionSetValue( 0 ),
+                        Description = preImage.ImageName,
                         Relevant = true,
-                        Attributes1 = preImage.PreImageAttributes != null && preImage.PreImageAttributes.Length > 0
-                            ? string.Join(",", preImage.PreImageAttributes)
+                        Attributes1 = preImage.ImageAttributes != null && preImage.ImageAttributes.Length > 0
+                            ? string.Join( ",", preImage.ImageAttributes )
                             : null
                     };
-                    uow.Create(image);
-                    Console.WriteLine("Pre image created " + preImage.Name);
+                    uow.Create( image );
+                    Console.WriteLine( $"Pre image {preImage.ImageName} created " + preImage.Name );
                 }
                 else
                 {
-                    var clean = uow.SdkMessageProcessingStepImages.Clean(image);
+                    var clean = uow.SdkMessageProcessingStepImages.Clean( image );
 
-                    var preAtr = preImage.PreImageAttributes == null || preImage.PreImageAttributes.Length == 0
+                    var preAtr = preImage.ImageAttributes == null || preImage.ImageAttributes.Length == 0
                         ? null
-                        : string.Join(",", preImage.PreImageAttributes);
+                        : string.Join( ",", preImage.ImageAttributes );
 
-                    if (preAtr != image.Attributes1)
+                    if( preAtr != image.Attributes1 )
                     {
                         clean.Attributes1 = preAtr;
-                        uow.Update(clean);
-                        Console.WriteLine("Pre image updated " + preImage.Name + " :" + preAtr);
+                        uow.Update( clean );
+                        Console.WriteLine( "Pre image updated " + preImage.Name + " :" + preAtr );
                     }
 
                     image.Relevant = true;
                 }
             }
 
-            var notNeededs = (from im in allImages where im.Relevant == false select im).ToArray();
-            foreach (var notNeeded in notNeededs)
+            var notNeededs = ( from im in allImages where im.Relevant == false select im ).ToArray( );
+            foreach( var notNeeded in notNeededs )
             {
-                uow.Delete(notNeeded);
-                Console.WriteLine("Preimage deleted for " + notNeeded.Name);
+                uow.Delete( notNeeded );
+                Console.WriteLine( "Preimage deleted for " + notNeeded.Name );
             }
         }
 
 
-        private static void CreatePostImages(EntityExtenions.CrmUnitOfWork uow,
-            Model.Step[] postImages, SdkMessageProcessingStepImage[] allImages,
-            Dictionary<string, SdkMessageProcessingStep> stepindex)
+        private static void CreatePostImages( UnitOfWork uow,
+                                              Step[] postImages,
+                                              SdkMessageProcessingStepImage[] allImages,
+                                              IReadOnlyDictionary< string, SdkMessageProcessingStep > stepindex )
         {
-            foreach (var postImage in postImages)
+            foreach( var postImage in postImages )
             {
 
-                var xrmStep = stepindex[postImage.UniqueName];
-                var image = (from im in allImages
-                    where xrmStep.SdkMessageProcessingStepId != null && (im.SdkMessageProcessingStepId.Id == xrmStep.SdkMessageProcessingStepId.Value &&
-                                                                         im.Name == "postImage")
-                    select im).SingleOrDefault();
-                if (image == null)
+                var xrmStep = stepindex[ postImage.UniqueName ];
+                var image = ( from im in allImages
+                    where xrmStep.SdkMessageProcessingStepId != null && ( im.SdkMessageProcessingStepId.Id == xrmStep.SdkMessageProcessingStepId.Value &&
+                        im.Name == "postImage" )
+                    select im ).SingleOrDefault( );
+                if( image == null )
                 {
                     image = new SdkMessageProcessingStepImage
                     {
-                        SdkMessageProcessingStepImageId = Guid.NewGuid(),
-                        SdkMessageProcessingStepId = xrmStep.ToEntityReference(),
-                        Name = "postImage",
-                        EntityAlias = "postImage",
+                        SdkMessageProcessingStepImageId = Guid.NewGuid( ),
+                        SdkMessageProcessingStepId = xrmStep.ToEntityReference( ),
+                        Name = postImage.ImageName,
+                        EntityAlias = postImage.ImageName,
                         MessagePropertyName = postImage.MessagePropertyName,
-                        ImageType = new OptionSetValue(1),
-                        Description = "postImage",
+                        ImageType = new OptionSetValue( 1 ),
+                        Description = postImage.ImageName,
                         Relevant = true,
-                        Attributes1 = postImage.PreImageAttributes != null && postImage.PreImageAttributes.Length > 0
-                            ? string.Join(",", postImage.PreImageAttributes)
+                        Attributes1 = postImage.ImageAttributes != null && postImage.ImageAttributes.Length > 0
+                            ? string.Join( ",", postImage.ImageAttributes )
                             : null
                     };
-                    uow.Create(image);
-                    Console.WriteLine("Post image created " + postImage.Name);
+                    uow.Create( image );
+                    Console.WriteLine( $"Post image {postImage.ImageName} created " + postImage.Name );
                 }
                 else
                 {
-                    var clean = uow.SdkMessageProcessingStepImages.Clean(image);
+                    var clean = uow.SdkMessageProcessingStepImages.Clean( image );
 
-                    var preAtr = postImage.PreImageAttributes == null || postImage.PreImageAttributes.Length == 0
+                    var preAtr = postImage.ImageAttributes == null || postImage.ImageAttributes.Length == 0
                         ? null
-                        : string.Join(",", postImage.PreImageAttributes);
+                        : string.Join( ",", postImage.ImageAttributes );
 
-                    if (preAtr != image.Attributes1)
+                    if( preAtr != image.Attributes1 )
                     {
                         clean.Attributes1 = preAtr;
-                        uow.Update(clean);
-                        Console.WriteLine("Post image updated " + postImage.Name + " :" + preAtr);
+                        uow.Update( clean );
+                        Console.WriteLine( "Post image updated " + postImage.Name + " :" + preAtr );
                     }
 
                     image.Relevant = true;
                 }
             }
 
-            var notNeededs = (from im in allImages where im.Relevant == false select im).ToArray();
-            foreach (var notNeeded in notNeededs)
+            var notNeededs = ( from im in allImages where im.Relevant == false select im ).ToArray( );
+            foreach( var notNeeded in notNeededs )
             {
-                uow.Delete(notNeeded);
-                Console.WriteLine("Post image deleted for " + notNeeded.Name);
+                uow.Delete( notNeeded );
+                Console.WriteLine( "Post image deleted for " + notNeeded.Name );
             }
         }
 
@@ -917,7 +919,7 @@ namespace Xrm.PluginDeployer
         /// <param name="service"></param>
         /// <param name="assemblyName"></param>
         /// <returns></returns>
-        public PluginAssembly RetrievePluginAssembly(IOrganizationService service, string assemblyName)
+        public PluginAssembly RetrievePluginAssembly( IOrganizationService service, string assemblyName )
         {
             var fetchXml =
                 $@"<fetch version=""1.0"" output-format=""xml-platform"" mapping=""logical"" distinct=""false"" no-lock=""true"">
@@ -925,26 +927,26 @@ namespace Xrm.PluginDeployer
 		                <attribute name=""{PluginAssembly.PropertyNames.PluginAssemblyId}"" />
                         <attribute name=""{PluginAssembly.PropertyNames.VersionNumber}"" />
 		                <filter type=""and"">
-			                <condition attribute=""{PluginAssembly.PropertyNames.ComponentState}"" operator=""eq"" value=""{(int) PluginAssembly.OptionSet.ComponentState.Published}""/>
+			                <condition attribute=""{PluginAssembly.PropertyNames.ComponentState}"" operator=""eq"" value=""{( int ) PluginAssembly.OptionSet.ComponentState.Published}""/>
 			                <condition attribute=""{PluginAssembly.PropertyNames.Name}"" operator=""eq"" value=""{assemblyName}""/>
 		                </filter>
 	                </entity>
                 </fetch>";
 
-            var result = service.RetrieveMultiple(new FetchExpression(fetchXml));
+            var result = service.RetrieveMultiple( new FetchExpression( fetchXml ) );
 
-            if (result.Entities.Count != 1)
+            if( result.Entities.Count != 1 )
             {
                 return null;
             }
 
-            var pluginAssembly = result.Entities.First().ToEntity<PluginAssembly>();
-            logger.Log($"Found assembly with id {pluginAssembly.Id}");
+            var pluginAssembly = result.Entities.First( ).ToEntity< PluginAssembly >( );
+            logger.Log( $"Found assembly with id {pluginAssembly.Id}" );
 
             return pluginAssembly;
         }
 
-        private IEnumerable<PluginType> RetrievePluginTypes(IOrganizationService service, Guid pluginAssemblyId)
+        private IEnumerable< PluginType > RetrievePluginTypes( IOrganizationService service, Guid pluginAssemblyId )
         {
             var fetchXml =
                 $@"<fetch version=""1.0"" output-format=""xml-platform"" mapping=""logical"" distinct=""false"" no-lock=""true"">
@@ -955,17 +957,17 @@ namespace Xrm.PluginDeployer
                         <attribute name=""{PluginType.PropertyNames.Description}"" />
 		                <filter type=""and"">
 			                <condition attribute=""{PluginType.PropertyNames.PluginAssemblyId}"" operator=""eq"" value=""{pluginAssemblyId}""/>
-			                <condition attribute=""{PluginType.PropertyNames.ComponentState}"" operator=""eq"" value=""{(int) PluginType.OptionSet.ComponentState.Published}""/>
+			                <condition attribute=""{PluginType.PropertyNames.ComponentState}"" operator=""eq"" value=""{( int ) PluginType.OptionSet.ComponentState.Published}""/>
 		                </filter>
 	                </entity>
                 </fetch>";
 
-            var response = service.RetrieveMultiple(new FetchExpression(fetchXml));
+            var response = service.RetrieveMultiple( new FetchExpression( fetchXml ) );
 
-            return response.Entities.Select(e => e.ToEntity<PluginType>());
+            return response.Entities.Select( e => e.ToEntity< PluginType >( ) );
         }
 
-        private IEnumerable<Solution> RetrieveSpecificSolution(IOrganizationService service)
+        private IEnumerable< Solution > RetrieveSpecificSolution( IOrganizationService service )
         {
             var fetchXml =
                 $@"<fetch version=""1.0"" output-format=""xml-platform"" mapping=""logical"" distinct=""false"" no-lock=""true"">
@@ -978,12 +980,12 @@ namespace Xrm.PluginDeployer
 	                </entity>
                 </fetch>";
 
-            var response = service.RetrieveMultiple(new FetchExpression(fetchXml));
+            var response = service.RetrieveMultiple( new FetchExpression( fetchXml ) );
 
-            return response.Entities.Select(e => e.ToEntity<Solution>());
+            return response.Entities.Select( e => e.ToEntity< Solution >( ) );
         }
 
-        private Publisher RetrievePublisher(IOrganizationService service, string publisher)
+        private Publisher RetrievePublisher( IOrganizationService service, string publisher )
         {
             var fetchXml =
                 $@"<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false' no-lock='true'>
@@ -996,41 +998,49 @@ namespace Xrm.PluginDeployer
 	                </entity>
                 </fetch>";
 
-            var response = service.RetrieveMultiple(new FetchExpression(fetchXml));
+            var response = service.RetrieveMultiple( new FetchExpression( fetchXml ) );
 
-            return response.Entities.First().ToEntity<Publisher>();
+            return response.Entities.First( ).ToEntity< Publisher >( );
         }
 
-        private IEnumerable<Dependency> RetrieveSdkStepsByPluginType(IOrganizationService service,
-            PluginType pluginType)
+        private static IEnumerable< Dependency > RetrieveSdkStepsByPluginType( IOrganizationService service,
+                                                                        PluginType pluginType )
         {
             var retrieveDependenciesForDeleteRequest = new RetrieveDependenciesForDeleteRequest
             {
-                ComponentType = (int) SolutionComponent.OptionSet.ComponentType.PluginType,
+                ComponentType = ( int ) SolutionComponent.OptionSet.ComponentType.PluginType,
                 ObjectId = pluginType.Id
             };
 
             var response =
-                (RetrieveDependenciesForDeleteResponse) service.Execute(retrieveDependenciesForDeleteRequest);
+                ( RetrieveDependenciesForDeleteResponse ) service.Execute( retrieveDependenciesForDeleteRequest );
 
-            return response.EntityCollection.Entities.Select(e => e.ToEntity<Dependency>());
+            return response.EntityCollection.Entities.Select( e => e.ToEntity< Dependency >( ) );
         }
 
-        private IEnumerable<OrganizationRequest> RetrieveDependentComponents(IOrganizationService service,
-            Dependency dependency)
+        private IEnumerable< OrganizationRequest > RetrieveDependentComponents( IOrganizationService service,
+                                                                                Dependency dependency )
         {
-            var retrieveRequiredComponentsRequest = new RetrieveRequiredComponentsRequest()
+            if( dependency.DependentComponentObjectId == null )
+            {
+                yield break;
+            }
+
+            var retrieveRequiredComponentsRequest = new RetrieveRequiredComponentsRequest( )
             {
                 ComponentType = dependency.DependentComponentType.Value,
                 ObjectId = dependency.DependentComponentObjectId.Value
             };
 
-            var response = (RetrieveRequiredComponentsResponse) service.Execute(retrieveRequiredComponentsRequest);
+            var response = ( RetrieveRequiredComponentsResponse ) service.Execute( retrieveRequiredComponentsRequest );
 
-            foreach (var dep in response.EntityCollection.Entities.Select(e => e.ToEntity<Dependency>()))
+            foreach( var dep in response.EntityCollection.Entities.Select( e => e.ToEntity< Dependency >( ) ) )
             {
-                if (dep.RequiredComponentType.Value == (int) Dependency.OptionSet.ComponentType.Workflow)
+                if( dep.RequiredComponentType.Value != ( int ) Dependency.OptionSet.ComponentType.Workflow )
                 {
+                    continue;
+                }
+                if( dep.RequiredComponentObjectId != null )
                     yield return new AddSolutionComponentRequest
                     {
                         AddRequiredComponents = false,
@@ -1038,7 +1048,6 @@ namespace Xrm.PluginDeployer
                         ComponentId = dep.RequiredComponentObjectId.Value,
                         SolutionUniqueName = SolutionName
                     };
-                }
             }
         }
     }

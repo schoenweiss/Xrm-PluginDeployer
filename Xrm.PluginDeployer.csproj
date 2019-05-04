@@ -84,7 +84,6 @@
     <Compile Include="References\EntityExtensions\SdkMessageProcessingStepImage.cs" />
     <Compile Include="References\Utility\UnitOfWork.cs" />
     <Compile Include="References\Model\CrmEventType.cs" />
-    <Compile Include="References\Model\Solution.cs" />
     <Compile Include="References\Model\StateEnum.cs" />
     <Compile Include="References\Model\Step.cs" />
     <Compile Include="PluginDeployer.cs" />

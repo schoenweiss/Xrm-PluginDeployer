@@ -1,7 +1,7 @@
 ﻿using System;
 using Microsoft.Xrm.Sdk;
 using PowerArgs;
-using Xrm.PluginDeployer.Utility.Tooling;
+using Xrm.PluginDeployer.Utility;
 
 namespace Xrm.PluginDeployer
 {
@@ -34,32 +34,31 @@ namespace Xrm.PluginDeployer
             {
                 IOrganizationService sourceService = null;
                 var destinationSystem = parsedArgs.DestinationSystem;
-                IOrganizationService destinationService =
-                    OrganizationServiceFactory.ConnectByConnectionString(destinationSystem);
+                IOrganizationService destinationService = OrganizationServiceFactory.ConnectByConnectionString(destinationSystem);
                 if (parsedArgs.SourceSystem != null)
                 {
-                    sourceService =
-                        OrganizationServiceFactory.ConnectByConnectionString(
-                            parsedArgs.SourceSystem + "RequireNewInstance = True;");
+                    sourceService = OrganizationServiceFactory.ConnectByConnectionString( parsedArgs.SourceSystem + "RequireNewInstance = True;");
                 }
 
-                var deployer = new PluginDeployer(sourceService, destinationService,
-                    parsedArgs.Prefix, logger);
+                var deployer = new PluginDeployer(sourceService, destinationService, parsedArgs.Prefix, logger);
 
-                if (!deployer.LoadAssembly(parsedArgs.AssemblyPath)) return;
+                if( !deployer.LoadAssembly( parsedArgs.AssemblyPath ) )
+                {
+                    return;
+                }
 
                 var assemblyName = deployer.AssemblyPlugin.GetName().Name;
-                var destPluginAssembly = deployer.RetrievePluginAssembly(destinationService, assemblyName);
+                var destinationAssembly = deployer.RetrievePluginAssembly(destinationService, assemblyName);
 
                 var createFromScratch = parsedArgs.Create;
 
                 if (createFromScratch)
                 {
-                    deployer.CreateFromScratch(parsedArgs, destPluginAssembly);
+                    deployer.CreateFromScratch(parsedArgs, destinationAssembly);
                 }
                 else
                 {
-                    deployer.UpdateSystem(parsedArgs, destPluginAssembly);
+                    deployer.UpdateSystem(parsedArgs, destinationAssembly);
                 }
             }
             catch (Exception ex)
@@ -72,12 +71,7 @@ namespace Xrm.PluginDeployer
 
         private static string GetAllExceptionMessages(Exception ex)
         {
-            if (ex == null)
-            {
-                return string.Empty;
-            }
-
-            return $"{ex.Message}{GetAllExceptionMessages(ex.InnerException)}";
+            return ex == null ? string.Empty : $"{ex.Message}{GetAllExceptionMessages(ex.InnerException)}";
         }
     }
 }

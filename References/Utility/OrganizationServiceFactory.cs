@@ -3,7 +3,7 @@ using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Tooling.Connector;
 using System.Configuration;
 
-namespace Xrm.PluginDeployer.Utility.Tooling
+namespace Xrm.PluginDeployer.Utility
 {
     /// <summary>
     /// Connect to CRM via different factory methods

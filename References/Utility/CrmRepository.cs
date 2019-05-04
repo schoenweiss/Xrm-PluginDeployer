@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Linq;
 
-namespace Xrm.PluginDeployer.EntityExtensions
+namespace Xrm.PluginDeployer.Utility
 {
     /// <summary>
     /// Implementation of the Larsen.Xrm.Entities.Repository{T} using the against a CRM context.

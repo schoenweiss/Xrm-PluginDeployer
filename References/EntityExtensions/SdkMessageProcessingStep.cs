@@ -5,12 +5,6 @@
         /// <summary>
         /// Name/Stage/Rank/Mode/AsyncAutoDelete
         /// </summary>
-        public string UniqueName
-        {
-            get
-            {
-                return this.Name + "/" + this.Stage.Value + "/" + this.Rank + "/"  + this.Mode.Value.ToString();
-            }
-        }
+        public string UniqueName => Name + "/" + Stage.Value + "/" + Rank + "/"  + Mode.Value;
     }
 }

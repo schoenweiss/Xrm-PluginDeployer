@@ -1,15 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Xrm.PluginDeployer.Model
 {
     public class Step
     {
         public Type Class { get; set; }
-        public Solution Solution { get; set; }
         public CrmEventType EventType { get; set; }
         public string PrimaryEntity { get; set; }
         public string SecondaryEntity { get; set; }
@@ -18,23 +13,21 @@ namespace Xrm.PluginDeployer.Model
         public StageEnum Stage { get; set; }
         public bool PreImage { get; set; }
         public bool PostImage { get; set; }
-        public string[] PreImageAttributes { get; set; }
-        public string[] PostImageAttributes { get; set; }
+        public string ImageName { get; set; }
+        public string[] ImageAttributes { get; set; }
         public bool Offline { get; set; }
 
-        public int Async
-        {
-            get
-            {
-                return (this.Stage == StageEnum.PostOperationAsyncWithDelete || this.Stage == StageEnum.PostOperationAsyncWithoutDelete) ? 1 : 0;
-            }
-        }
+        public int Async => (this.Stage == StageEnum.PostOperationAsyncWithDelete || this.Stage == StageEnum.PostOperationAsyncWithoutDelete) ? 1 : 0;
 
+        /// <summary>
+        /// Returns Stage number according StageEnum
+        /// </summary>
+        /// <exception cref="ArgumentException"></exception>
         public int StageValue
         {
             get
             {
-                switch (this.Stage)
+                switch (Stage)
                 {
                     case StageEnum.PostOperation: return 40;
                     case StageEnum.PostOperationAsyncWithDelete: return 40;
@@ -46,6 +39,10 @@ namespace Xrm.PluginDeployer.Model
             }
         }
 
+        /// <summary>
+        /// Returns 
+        /// </summary>
+        /// <exception cref="ArgumentException"></exception>
         public string MessagePropertyName
         {
             get
@@ -68,28 +65,15 @@ namespace Xrm.PluginDeployer.Model
             }
         }
 
-        public bool DeleteAfterSuccess
-        {
-            get
-            {
-                return this.Stage == StageEnum.PostOperationAsyncWithDelete;
-            }
-        }
 
-        public string Name
-        {
-            get
-            {
-                return Class.FullName + ": " + EventType.ToString() + " of " + PrimaryEntity;
-            }
-        }
+        /// <summary>
+        /// Name of Step, used for logging
+        /// </summary>
+        public string Name => Class.FullName + ": " + EventType + " of " + PrimaryEntity;
 
-        public string UniqueName
-        {
-            get
-            {
-                return this.Name + "/" + (int)this.StageValue + "/" + this.ExecutionOrder + "/" + this.Async.ToString();
-            }
-        }
+        /// <summary>
+        /// Returns unique name for Step
+        /// </summary>
+        public string UniqueName => Name + "/" + StageValue + "/" + ExecutionOrder + "/" + Async;
     }
 }

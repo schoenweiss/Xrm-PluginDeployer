@@ -1,9 +1,8 @@
 ﻿using Microsoft.Xrm.Sdk;
-using Xrm.PluginDeployer.EntityExtensions;
 using System;
 using Xrm.PluginDeployer.Entities;
 
-namespace Xrm.PluginDeployer.EntityExtenions
+namespace Xrm.PluginDeployer.Utility
 {
     public class CrmUnitOfWork: UnitOfWork, IDisposable
     {

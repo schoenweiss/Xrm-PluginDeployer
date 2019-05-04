@@ -3,7 +3,7 @@ using log4net;
 using log4net.Config;
 using Microsoft.Xrm.Sdk;
 
-namespace Xrm.PluginDeployer.Utility.Tooling
+namespace Xrm.PluginDeployer.Utility
 {
     public class ConsoleLogger : ITracingService
     {

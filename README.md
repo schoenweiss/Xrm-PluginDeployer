@@ -4,13 +4,13 @@ This tool automates and simplifies your deployment of assemblies, its plugins, w
 
 ## Options
 ```Bash
-AssemblyPath* (-A)        Path to Assembly (e.g. C:\PathToAssembly\Plugin.Account.dll
-SourceSystem (-S)         CRM ConnectionString to source system.
-DestinationSystem* (-D)   CRM ConnectionString to destination system. If string is given, the PluginType and SdkMessageProcessingSteps will be synchronized.
-Sync (-Sy)                Sync Steps: (Old) steps will be deleted [Default='False']
-Create (-C)               Creates assembly, its plugins, steps and images in destination system [Default='False']
-Prefix (-P)               If Sync was set to true a solution will be created. Choose prefix of this solution here.
-Publisher (-Pu)           Publisher needed to create and transport sync solution [Default='DefaultPublisher']
+AssemblyPath* (-A)        Path to Assembly dll
+SourceSystem (-S)         CRM-ConnectionString to source system. If this string is given, the Plugins, Steps and Images will be synchronized.
+DestinationSystem* (-D)   CRM-ConnectionString to the destination system.
+Sync (-Sy)                Syncs steps and images. (Old) steps will be deleted [Default='False'].
+Create (-C)               Creates assembly, its plugins, steps and images in destination system [Default='False'].
+Prefix (-P)               If Sync was set to true a solution will be created. Choose prefix of this solution here. [Default='PluginDeployer']
+Publisher (-Pu)           Publisher needed to create and transport solution. [Default='DefaultPublisher']
 ```
 
 ## Scenarios

@@ -1,12 +1,11 @@
 ﻿using System;
 using System.Linq;
 
-namespace Xrm.PluginDeployer.EntityExtensions
+namespace Xrm.PluginDeployer.Utility
 {
     /// <summary>
     /// Interface for generic repository implementations.
     /// </summary>
-    /// <typeparam name="T">Class that implement <see cref="Portal.Core.Model.IEntity"/>.</typeparam>
     public interface Repository<T>
     {
         /// <summary>
