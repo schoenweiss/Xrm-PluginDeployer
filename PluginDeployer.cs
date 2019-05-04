@@ -627,13 +627,10 @@ namespace Xrm.PluginDeployer
 
             // Create Images
             var allImages = ( from im in uow.SdkMessageProcessingStepImages.GetQuery( )
-                join st in uow.SdkMessageProcessingSteps.GetQuery( ) on im.SdkMessageProcessingStepId.Id equals st
-                    .SdkMessageProcessingStepId
+                join st in uow.SdkMessageProcessingSteps.GetQuery( ) on im.SdkMessageProcessingStepId.Id equals st.SdkMessageProcessingStepId
                 join pl in uow.PluginTypes.GetQuery( ) on st.EventHandler.Id equals pl.PluginTypeId
                 where pl.PluginAssemblyId.Id == plugin.PluginAssemblyId
                 select im ).ToList( );
-
-
 
             CreateImages( uow, stepsToCreate, allImages, steps );
 
@@ -701,9 +698,7 @@ namespace Xrm.PluginDeployer
 
 
             var sdkMessageIndex = ( from s in uow.SdkMessages.GetQuery( ) select s ).ToArray( ).ToDictionary( s => s.Name );
-
-
-
+            
             foreach( var step in stepsToCreate )
             {
                 var sdkMessage = sdkMessageIndex[ step.EventType.ToString( ) ];
@@ -826,7 +821,14 @@ namespace Xrm.PluginDeployer
                                 : null
                         };
                         uow.Create( imageToCreate );
-                        Console.WriteLine( $"Pre image {step.ImageName} created " + step.Name );
+                        if( step.PreImage )
+                        {
+                            Console.WriteLine($"Pre Image {step.ImageName} created " + step.Name);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Post Image {step.ImageName} created " + step.Name);
+                        }
                     }
                     else
                     {
