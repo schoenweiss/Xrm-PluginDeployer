@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Xrm.PluginDeployer.Model
+namespace Xrm.PluginDeployer.References.StepModel
 {
     public class Step
     {
@@ -17,7 +17,7 @@ namespace Xrm.PluginDeployer.Model
         public string[] ImageAttributes { get; set; }
         public bool Offline { get; set; }
 
-        public int Async => (this.Stage == StageEnum.PostOperationAsyncWithDelete || this.Stage == StageEnum.PostOperationAsyncWithoutDelete) ? 1 : 0;
+        public int Async => ( this.Stage == StageEnum.PostOperationAsyncWithDelete || this.Stage == StageEnum.PostOperationAsyncWithoutDelete ) ? 1 : 0;
 
         /// <summary>
         /// Returns Stage number according StageEnum
@@ -27,14 +27,14 @@ namespace Xrm.PluginDeployer.Model
         {
             get
             {
-                switch (Stage)
+                switch( Stage )
                 {
                     case StageEnum.PostOperation: return 40;
                     case StageEnum.PostOperationAsyncWithDelete: return 40;
                     case StageEnum.PostOperationAsyncWithoutDelete: return 40;
                     case StageEnum.PreValidate: return 10;
                     case StageEnum.PreOperation: return 20;
-                    default: throw new ArgumentException("Stage " + Stage.ToString() + " has not been mapeed");
+                    default: throw new ArgumentException( "Stage " + Stage.ToString( ) + " has not been mapeed" );
                 }
             }
         }
@@ -47,7 +47,7 @@ namespace Xrm.PluginDeployer.Model
         {
             get
             {
-                switch (EventType)
+                switch( EventType )
                 {
                     case CrmEventType.Associate:
                     case CrmEventType.Disassociate:
@@ -60,7 +60,7 @@ namespace Xrm.PluginDeployer.Model
                         return "Target";
                     case CrmEventType.Create:
                         return "Id";
-                    default: throw new ArgumentException("MessagePropertyName has not been maped for " + EventType);
+                    default: throw new ArgumentException( "MessagePropertyName has not been maped for " + EventType );
                 }
             }
         }

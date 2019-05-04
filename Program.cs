@@ -14,19 +14,19 @@ namespace Xrm.PluginDeployer
         /// Here it all begins
         /// </summary>
         /// <param name="args"></param>
-        public static void Main(string[] args)
+        public static void Main( string[] args )
         {
-            var logger = new ConsoleLogger(typeof(Program));
+            var logger = new ConsoleLogger( typeof( Program ) );
 
             CmdArgs parsedArgs;
             try
             {
-                parsedArgs = Args.Parse<CmdArgs>(args);
+                parsedArgs = Args.Parse< CmdArgs >( args );
             }
-            catch (ArgException e)
+            catch( ArgException e )
             {
-                Console.WriteLine(ArgUsage.GenerateUsageFromTemplate<CmdArgs>());
-                logger.Error($"Failed to parse arguments: {e.Message}");
+                Console.WriteLine( ArgUsage.GenerateUsageFromTemplate< CmdArgs >( ) );
+                logger.Error( $"Failed to parse arguments: {e.Message}" );
                 return;
             }
 
@@ -34,44 +34,44 @@ namespace Xrm.PluginDeployer
             {
                 IOrganizationService sourceService = null;
                 var destinationSystem = parsedArgs.DestinationSystem;
-                IOrganizationService destinationService = OrganizationServiceFactory.ConnectByConnectionString(destinationSystem);
-                if (parsedArgs.SourceSystem != null)
+                IOrganizationService destinationService = OrganizationServiceFactory.ConnectByConnectionString( destinationSystem );
+                if( parsedArgs.SourceSystem != null )
                 {
-                    sourceService = OrganizationServiceFactory.ConnectByConnectionString( parsedArgs.SourceSystem + "RequireNewInstance = True;");
+                    sourceService = OrganizationServiceFactory.ConnectByConnectionString( parsedArgs.SourceSystem + "RequireNewInstance = True;" );
                 }
 
-                var deployer = new PluginDeployer(sourceService, destinationService, parsedArgs.Prefix, logger);
+                var deployer = new PluginDeployer( sourceService, destinationService, parsedArgs.Prefix, logger );
 
                 if( !deployer.LoadAssembly( parsedArgs.AssemblyPath ) )
                 {
                     return;
                 }
 
-                var assemblyName = deployer.AssemblyPlugin.GetName().Name;
-                var destinationAssembly = deployer.RetrievePluginAssembly(destinationService, assemblyName);
+                var assemblyName = deployer.AssemblyPlugin.GetName( ).Name;
+                var destinationAssembly = deployer.RetrievePluginAssembly( destinationService, assemblyName );
 
                 var createFromScratch = parsedArgs.Create;
 
-                if (createFromScratch)
+                if( createFromScratch )
                 {
-                    deployer.CreateFromScratch(parsedArgs, destinationAssembly);
+                    deployer.CreateFromScratch( parsedArgs, destinationAssembly );
                 }
                 else
                 {
-                    deployer.UpdateSystem(parsedArgs, destinationAssembly);
+                    deployer.UpdateSystem( parsedArgs, destinationAssembly );
                 }
             }
-            catch (Exception ex)
+            catch( Exception ex )
             {
-                logger.Error($"Exception occured, terminating. Exception: {GetAllExceptionMessages(ex)}\n\n");
-                logger.Error($"Stacktrace: {ex.StackTrace}");
+                logger.Error( $"Exception occured, terminating. Exception: {GetAllExceptionMessages( ex )}\n\n" );
+                logger.Error( $"Stacktrace: {ex.StackTrace}" );
             }
         }
 
 
-        private static string GetAllExceptionMessages(Exception ex)
+        private static string GetAllExceptionMessages( Exception ex )
         {
-            return ex == null ? string.Empty : $"{ex.Message}{GetAllExceptionMessages(ex.InnerException)}";
+            return ex == null ? string.Empty : $"{ex.Message}{GetAllExceptionMessages( ex.InnerException )}";
         }
     }
 }

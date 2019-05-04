@@ -5,6 +5,6 @@
         /// <summary>
         /// Name/Stage/Rank/Mode/AsyncAutoDelete
         /// </summary>
-        public string UniqueName => Name + "/" + Stage.Value + "/" + Rank + "/"  + Mode.Value;
+        public string UniqueName => Name + "/" + Stage.Value + "/" + Rank + "/" + Mode.Value;
     }
 }

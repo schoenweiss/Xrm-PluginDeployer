@@ -10,9 +10,12 @@ using Microsoft.Crm.Sdk.Messages;
 using Microsoft.Xrm.Sdk;
 using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
+using PowerArgs;
 using Xrm.PluginDeployer.Entities;
-using Xrm.PluginDeployer.Model;
+using Xrm.PluginDeployer.References.StepModel;
+using Xrm.PluginDeployer.UnitOfWork;
 using Xrm.PluginDeployer.Utility;
+
 
 namespace Xrm.PluginDeployer
 {
@@ -104,13 +107,14 @@ namespace Xrm.PluginDeployer
             var dllContentBytes = File.ReadAllBytes( AssemblyPlugin.Location );
             var dllContent = Convert.ToBase64String( dllContentBytes );
 
-            if( pluginAssembly != null )
+            if( pluginAssembly == null )
             {
-                UpdatePluginAssembly( destinationSystem, pluginAssembly, dllContent );
-                return pluginAssembly;
+                return CreatePluginAssembly( destinationSystem, AssemblyPlugin, dllContent );
             }
 
-            return CreatePluginAssembly( destinationSystem, AssemblyPlugin, dllContent );
+            UpdatePluginAssembly( destinationSystem, pluginAssembly, dllContent );
+            return pluginAssembly;
+
         }
 
         /// <summary>
@@ -120,7 +124,7 @@ namespace Xrm.PluginDeployer
         /// Workflows are a special type of PluginType
         /// </summary>
         /// <param name="pluginAssembly">PluginAssembly from the destination system</param>
-        private void CreateNewPluginTypesInDestination( PluginAssembly pluginAssembly )
+        private void CreateNewPluginTypesInDestination( Entity pluginAssembly )
         {
             var foundPlugins = SearchForPlugins( ).ToList( );
             var registeredPluginTypes = RetrievePluginTypes( destinationSystem, pluginAssembly.Id ).ToList( );
@@ -152,7 +156,7 @@ namespace Xrm.PluginDeployer
             }
         }
 
-        private void DeleteStepsByPluginType( PluginType pluginType )
+        private void DeleteStepsByPluginType( Entity pluginType )
         {
             var dependentObjects = RetrieveSdkStepsByPluginType( destinationSystem, pluginType );
             DeleteDependentObjects( destinationSystem, dependentObjects );
@@ -184,8 +188,8 @@ namespace Xrm.PluginDeployer
         /// <summary>
         /// Creates solution with all components of the pluginAssembly in the source system. Then Imports the solution to the destination system
         /// </summary>
-        private void SyncPluginStepsViaSolution( PluginAssembly sourcePluginAssembly,
-                                                 PluginAssembly destPluginAssembly,
+        private void SyncPluginStepsViaSolution( Entity sourcePluginAssembly,
+                                                 Entity destPluginAssembly,
                                                  string publisher )
         {
             var solutions = RetrieveSpecificSolution( sourceSystem ).ToList( );
@@ -221,7 +225,7 @@ namespace Xrm.PluginDeployer
         /// Delete all registered plugintypes+steps and workflows which are not in the assembly anymore
         /// </summary>
         /// <param name="pluginAssembly"></param>
-        private void DeleteOldPluginTypeStepsOfAssembly( PluginAssembly pluginAssembly )
+        private void DeleteOldPluginTypeStepsOfAssembly( Entity pluginAssembly )
         {
             if( pluginAssembly == null )
             {
@@ -259,7 +263,7 @@ namespace Xrm.PluginDeployer
         /// Delete all registered plugintypes+steps and workflows which are not in the assembly anymore
         /// </summary>
         /// <param name="pluginAssembly"></param>
-        private void DeleteAllPluginTypeStepsOfAssembly( PluginAssembly pluginAssembly )
+        private void DeleteAllPluginTypeStepsOfAssembly( Entity pluginAssembly )
         {
             if( pluginAssembly == null )
             {
@@ -627,13 +631,11 @@ namespace Xrm.PluginDeployer
                     .SdkMessageProcessingStepId
                 join pl in uow.PluginTypes.GetQuery( ) on st.EventHandler.Id equals pl.PluginTypeId
                 where pl.PluginAssemblyId.Id == plugin.PluginAssemblyId
-                select im ).ToArray( );
+                select im ).ToList( );
 
-            var preImages = ( from s in stepsToCreate where s.PreImage select s ).ToArray( );
-            var postImages = ( from s in stepsToCreate where s.PostImage select s ).ToArray( );
 
-            CreatePreImages( uow, preImages, allImages, steps );
-            CreatePostImages( uow, postImages, allImages, steps );
+
+            CreateImages( uow, stepsToCreate, allImages, steps );
 
             logger.Log(
                 $"Successfully created steps and images of Plugin {AssemblyPlugin.GetName( ).Name} in {destinationSystem}." );
@@ -688,7 +690,7 @@ namespace Xrm.PluginDeployer
             return stepsToCreate;
         }
 
-        private void CreateSteps( UnitOfWork uow,
+        private void CreateSteps( UnitOfWork.UnitOfWork uow,
                                   PluginAssembly plugin,
                                   IDictionary< string, SdkMessageProcessingStep > steps,
                                   IReadOnlyCollection< Step > stepsToCreate )
@@ -774,17 +776,14 @@ namespace Xrm.PluginDeployer
                     Console.WriteLine( "Changed supported deployment for " + edit.Name + " > " + deployment );
                 }
 
-                if( edit.Stage == StageEnum.PostOperationAsyncWithDelete &&
-                    !( step.AsyncAutoDelete ?? false ) )
+                if( edit.Stage == StageEnum.PostOperationAsyncWithDelete && !( step.AsyncAutoDelete ?? false ) )
                 {
                     var clean = uow.SdkMessageProcessingSteps.Clean( step );
                     clean.AsyncAutoDelete = true;
                     uow.Update( clean );
                     Console.WriteLine( "Changed async delete policy deployment for " + edit.Name + " > " + deployment );
                 }
-
-                if( edit.Stage == StageEnum.PostOperationAsyncWithoutDelete &&
-                    ( step.AsyncAutoDelete ?? false ) )
+                else if( edit.Stage == StageEnum.PostOperationAsyncWithoutDelete && ( step.AsyncAutoDelete ?? false ) )
                 {
                     var clean = uow.SdkMessageProcessingSteps.Clean( step );
                     clean.AsyncAutoDelete = false;
@@ -795,123 +794,74 @@ namespace Xrm.PluginDeployer
         }
 
 
-        private static void CreatePreImages( UnitOfWork uow,
-                                             Step[] preImages,
-                                             SdkMessageProcessingStepImage[] allImages,
-                                             IReadOnlyDictionary< string, SdkMessageProcessingStep > stepindex )
+        private static void CreateImages( UnitOfWork.UnitOfWork uow,
+                                          IEnumerable< Step > stepsToCreate,
+                                          IReadOnlyCollection< SdkMessageProcessingStepImage > allImages,
+                                          IReadOnlyDictionary< string, SdkMessageProcessingStep > stepindex )
         {
-            foreach( var preImage in preImages )
+            foreach( var step in stepsToCreate )
             {
-                var xrmStep = stepindex[ preImage.UniqueName ];
-                var image = ( from im in allImages
-                    where xrmStep.SdkMessageProcessingStepId != null && im.SdkMessageProcessingStepId.Id == xrmStep.SdkMessageProcessingStepId.Value && im.Name == "preImage"
-                    select im ).SingleOrDefault( );
-                if( image == null )
-                {
-                    image = new SdkMessageProcessingStepImage
-                    {
-                        SdkMessageProcessingStepImageId = Guid.NewGuid( ),
-                        SdkMessageProcessingStepId = xrmStep.ToEntityReference( ),
-                        Name = preImage.ImageName,
-                        EntityAlias = preImage.ImageName,
-                        MessagePropertyName = preImage.MessagePropertyName,
-                        ImageType = new OptionSetValue( 0 ),
-                        Description = preImage.ImageName,
-                        Relevant = true,
-                        Attributes1 = preImage.ImageAttributes != null && preImage.ImageAttributes.Length > 0
-                            ? string.Join( ",", preImage.ImageAttributes )
-                            : null
-                    };
-                    uow.Create( image );
-                    Console.WriteLine( $"Pre image {preImage.ImageName} created " + preImage.Name );
-                }
-                else
-                {
-                    var clean = uow.SdkMessageProcessingStepImages.Clean( image );
+                var xrmStep = stepindex[ step.UniqueName ];
+                var images = (
+                    from im in allImages
+                    where xrmStep.SdkMessageProcessingStepId != null && im.SdkMessageProcessingStepId.Id == xrmStep.SdkMessageProcessingStepId.Value
+                    select im );
 
-                    var preAtr = preImage.ImageAttributes == null || preImage.ImageAttributes.Length == 0
-                        ? null
-                        : string.Join( ",", preImage.ImageAttributes );
-
-                    if( preAtr != image.Attributes1 )
+                images.ForEach( image =>
+                {
+                    if( image == null )
                     {
-                        clean.Attributes1 = preAtr;
-                        uow.Update( clean );
-                        Console.WriteLine( "Pre image updated " + preImage.Name + " :" + preAtr );
+                        var imageToCreate = new SdkMessageProcessingStepImage
+                        {
+                            SdkMessageProcessingStepImageId = Guid.NewGuid( ),
+                            SdkMessageProcessingStepId = xrmStep.ToEntityReference( ),
+                            Name = step.ImageName,
+                            EntityAlias = step.ImageName,
+                            MessagePropertyName = step.MessagePropertyName,
+                            ImageType = step.PreImage ? new OptionSetValue( 0 ) : new OptionSetValue( 1 ),
+                            Description = step.ImageName,
+                            Relevant = true,
+                            Attributes1 = step.ImageAttributes != null && step.ImageAttributes.Length > 0
+                                ? string.Join( ",", step.ImageAttributes )
+                                : null
+                        };
+                        uow.Create( imageToCreate );
+                        Console.WriteLine( $"Pre image {step.ImageName} created " + step.Name );
                     }
+                    else
+                    {
+                        var clean = uow.SdkMessageProcessingStepImages.Clean( image );
 
-                    image.Relevant = true;
-                }
+                        var preAtr = step.ImageAttributes == null || step.ImageAttributes.Length == 0
+                            ? null
+                            : string.Join( ",", step.ImageAttributes );
+
+                        if( preAtr != image.Attributes1 )
+                        {
+                            clean.Attributes1 = preAtr;
+                            uow.Update( clean );
+                            if( step.PreImage )
+                            {
+                                Console.WriteLine( "Pre image updated " + step.Name + " :" + preAtr );
+                            }
+                            else
+                            {
+                                Console.WriteLine( "Post image updated " + step.Name + " :" + preAtr );
+                            }
+                        }
+
+                        image.Relevant = true;
+                    }
+                } );
             }
 
             var notNeededs = ( from im in allImages where im.Relevant == false select im ).ToArray( );
             foreach( var notNeeded in notNeededs )
             {
                 uow.Delete( notNeeded );
-                Console.WriteLine( "Preimage deleted for " + notNeeded.Name );
+                Console.WriteLine( "Image deleted for " + notNeeded.Name );
             }
         }
-
-
-        private static void CreatePostImages( UnitOfWork uow,
-                                              Step[] postImages,
-                                              SdkMessageProcessingStepImage[] allImages,
-                                              IReadOnlyDictionary< string, SdkMessageProcessingStep > stepindex )
-        {
-            foreach( var postImage in postImages )
-            {
-
-                var xrmStep = stepindex[ postImage.UniqueName ];
-                var image = ( from im in allImages
-                    where xrmStep.SdkMessageProcessingStepId != null && ( im.SdkMessageProcessingStepId.Id == xrmStep.SdkMessageProcessingStepId.Value &&
-                        im.Name == "postImage" )
-                    select im ).SingleOrDefault( );
-                if( image == null )
-                {
-                    image = new SdkMessageProcessingStepImage
-                    {
-                        SdkMessageProcessingStepImageId = Guid.NewGuid( ),
-                        SdkMessageProcessingStepId = xrmStep.ToEntityReference( ),
-                        Name = postImage.ImageName,
-                        EntityAlias = postImage.ImageName,
-                        MessagePropertyName = postImage.MessagePropertyName,
-                        ImageType = new OptionSetValue( 1 ),
-                        Description = postImage.ImageName,
-                        Relevant = true,
-                        Attributes1 = postImage.ImageAttributes != null && postImage.ImageAttributes.Length > 0
-                            ? string.Join( ",", postImage.ImageAttributes )
-                            : null
-                    };
-                    uow.Create( image );
-                    Console.WriteLine( $"Post image {postImage.ImageName} created " + postImage.Name );
-                }
-                else
-                {
-                    var clean = uow.SdkMessageProcessingStepImages.Clean( image );
-
-                    var preAtr = postImage.ImageAttributes == null || postImage.ImageAttributes.Length == 0
-                        ? null
-                        : string.Join( ",", postImage.ImageAttributes );
-
-                    if( preAtr != image.Attributes1 )
-                    {
-                        clean.Attributes1 = preAtr;
-                        uow.Update( clean );
-                        Console.WriteLine( "Post image updated " + postImage.Name + " :" + preAtr );
-                    }
-
-                    image.Relevant = true;
-                }
-            }
-
-            var notNeededs = ( from im in allImages where im.Relevant == false select im ).ToArray( );
-            foreach( var notNeeded in notNeededs )
-            {
-                uow.Delete( notNeeded );
-                Console.WriteLine( "Post image deleted for " + notNeeded.Name );
-            }
-        }
-
 
         /// <summary>
         /// Fetch the pluginassembly from the given service
@@ -922,13 +872,13 @@ namespace Xrm.PluginDeployer
         public PluginAssembly RetrievePluginAssembly( IOrganizationService service, string assemblyName )
         {
             var fetchXml =
-                $@"<fetch version=""1.0"" output-format=""xml-platform"" mapping=""logical"" distinct=""false"" no-lock=""true"">
-                    <entity name=""{PluginAssembly.EntityLogicalName}"">
-		                <attribute name=""{PluginAssembly.PropertyNames.PluginAssemblyId}"" />
-                        <attribute name=""{PluginAssembly.PropertyNames.VersionNumber}"" />
-		                <filter type=""and"">
-			                <condition attribute=""{PluginAssembly.PropertyNames.ComponentState}"" operator=""eq"" value=""{( int ) PluginAssembly.OptionSet.ComponentState.Published}""/>
-			                <condition attribute=""{PluginAssembly.PropertyNames.Name}"" operator=""eq"" value=""{assemblyName}""/>
+                $@"<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false' no-lock='true'>
+                    <entity name='{PluginAssembly.EntityLogicalName}'>
+		                <attribute name='{PluginAssembly.PropertyNames.PluginAssemblyId}' />
+                        <attribute name='{PluginAssembly.PropertyNames.VersionNumber}' />
+		                <filter type='and'>
+			                <condition attribute='{PluginAssembly.PropertyNames.ComponentState}' operator='eq' value='{( int ) PluginAssembly.OptionSet.ComponentState.Published}'/>
+			                <condition attribute='{PluginAssembly.PropertyNames.Name}' operator='eq' value='{assemblyName}'/>
 		                </filter>
 	                </entity>
                 </fetch>";
@@ -949,15 +899,15 @@ namespace Xrm.PluginDeployer
         private IEnumerable< PluginType > RetrievePluginTypes( IOrganizationService service, Guid pluginAssemblyId )
         {
             var fetchXml =
-                $@"<fetch version=""1.0"" output-format=""xml-platform"" mapping=""logical"" distinct=""false"" no-lock=""true"">
-	                <entity name=""{PluginType.EntityLogicalName}"">
-		                <attribute name=""{PluginType.PropertyNames.PluginTypeId}"" />
-		                <attribute name=""{PluginType.PropertyNames.TypeName}"" />
-                        <attribute name=""{PluginType.PropertyNames.IsWorkflowActivity}"" />
-                        <attribute name=""{PluginType.PropertyNames.Description}"" />
-		                <filter type=""and"">
-			                <condition attribute=""{PluginType.PropertyNames.PluginAssemblyId}"" operator=""eq"" value=""{pluginAssemblyId}""/>
-			                <condition attribute=""{PluginType.PropertyNames.ComponentState}"" operator=""eq"" value=""{( int ) PluginType.OptionSet.ComponentState.Published}""/>
+                $@"<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false' no-lock='true'>
+	                <entity name='{PluginType.EntityLogicalName}'>
+		                <attribute name='{PluginType.PropertyNames.PluginTypeId}' />
+		                <attribute name='{PluginType.PropertyNames.TypeName}' />
+                        <attribute name='{PluginType.PropertyNames.IsWorkflowActivity}' />
+                        <attribute name='{PluginType.PropertyNames.Description}' />
+		                <filter type='and'>
+			                <condition attribute='{PluginType.PropertyNames.PluginAssemblyId}' operator='eq' value='{pluginAssemblyId}'/>
+			                <condition attribute='{PluginType.PropertyNames.ComponentState}' operator='eq' value='{( int ) PluginType.OptionSet.ComponentState.Published}'/>
 		                </filter>
 	                </entity>
                 </fetch>";
@@ -970,12 +920,12 @@ namespace Xrm.PluginDeployer
         private IEnumerable< Solution > RetrieveSpecificSolution( IOrganizationService service )
         {
             var fetchXml =
-                $@"<fetch version=""1.0"" output-format=""xml-platform"" mapping=""logical"" distinct=""false"" no-lock=""true"">
-	                <entity name=""{Solution.EntityLogicalName}"">
-		                <attribute name=""{Solution.PropertyNames.SolutionId}"" />
-		                <attribute name=""{Solution.PropertyNames.UniqueName}"" />
-		                <filter type=""and"">
-			                <condition attribute=""{Solution.PropertyNames.UniqueName}"" operator=""eq"" value=""{SolutionName}""/>
+                $@"<fetch version='1.0' output-format='xml-platform' mapping='logical' distinct='false' no-lock='true'>
+	                <entity name='{Solution.EntityLogicalName}'>
+		                <attribute name='{Solution.PropertyNames.SolutionId}' />
+		                <attribute name='{Solution.PropertyNames.UniqueName}' />
+		                <filter type='and'>
+			                <condition attribute='{Solution.PropertyNames.UniqueName}' operator='eq' value='{SolutionName}'/>
 		                </filter>
 	                </entity>
                 </fetch>";
@@ -1004,7 +954,7 @@ namespace Xrm.PluginDeployer
         }
 
         private static IEnumerable< Dependency > RetrieveSdkStepsByPluginType( IOrganizationService service,
-                                                                        PluginType pluginType )
+                                                                               Entity pluginType )
         {
             var retrieveDependenciesForDeleteRequest = new RetrieveDependenciesForDeleteRequest
             {
@@ -1040,6 +990,7 @@ namespace Xrm.PluginDeployer
                 {
                     continue;
                 }
+
                 if( dep.RequiredComponentObjectId != null )
                     yield return new AddSolutionComponentRequest
                     {

@@ -68,7 +68,6 @@
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Activities" />
-    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
@@ -77,15 +76,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CmdArgs.cs" />
-    <Compile Include="References\Utility\CrmRepository.cs" />
-    <Compile Include="References\Utility\CrmUnitOfWork.cs" />
-    <Compile Include="References\Utility\Repository.cs" />
+    <Compile Include="UnitOfWork\CrmRepository.cs" />
+    <Compile Include="UnitOfWork\CrmUnitOfWork.cs" />
+    <Compile Include="UnitOfWork\Repository.cs" />
     <Compile Include="References\EntityExtensions\SdkMessageProcessingStep.cs" />
     <Compile Include="References\EntityExtensions\SdkMessageProcessingStepImage.cs" />
-    <Compile Include="References\Utility\UnitOfWork.cs" />
-    <Compile Include="References\Model\CrmEventType.cs" />
-    <Compile Include="References\Model\StateEnum.cs" />
-    <Compile Include="References\Model\Step.cs" />
+    <Compile Include="UnitOfWork\UnitOfWork.cs" />
     <Compile Include="PluginDeployer.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -104,6 +100,9 @@
     <Compile Include="References\Entities\WebResource.cs" />
     <Compile Include="References\Utility\ConsoleLogger.cs" />
     <Compile Include="References\Utility\OrganizationServiceFactory.cs" />
+    <Compile Include="StepModel\CrmEventType.cs" />
+    <Compile Include="StepModel\StateEnum.cs" />
+    <Compile Include="StepModel\Step.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

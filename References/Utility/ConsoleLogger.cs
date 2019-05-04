@@ -5,32 +5,32 @@ using Microsoft.Xrm.Sdk;
 
 namespace Xrm.PluginDeployer.Utility
 {
-    public class ConsoleLogger : ITracingService
+    public class ConsoleLogger: ITracingService
     {
-        private ILog _err;
-        private ILog _log;
+        private ILog err;
+        private ILog log;
 
-        public ConsoleLogger(Type type)
+        public ConsoleLogger( Type type )
         {
-            _err = LogManager.GetLogger( "root" ); // error
-            _log = LogManager.GetLogger(type);
+            err = LogManager.GetLogger( "root" ); // error
+            log = LogManager.GetLogger( type );
 
-            XmlConfigurator.Configure();
+            XmlConfigurator.Configure( );
         }
 
-        public void Trace(string format, params object[] args)
+        public void Trace( string format, params object[] args )
         {
-            Log(format, args);
+            Log( format, args );
         }
 
-        public void Log(string format, params object[] args)
+        public void Log( string format, params object[] args )
         {
-            _log.InfoFormat(format, args);
+            log.InfoFormat( format, args );
         }
 
-        public void Error(string format, params object[] args)
+        public void Error( string format, params object[] args )
         {
-            _err.ErrorFormat(format, args);
+            err.ErrorFormat( format, args );
         }
     }
 }

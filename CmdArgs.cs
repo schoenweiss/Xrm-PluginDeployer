@@ -29,4 +29,3 @@ namespace Xrm.PluginDeployer
         public string Publisher { get; set; }
     }
 }
-
