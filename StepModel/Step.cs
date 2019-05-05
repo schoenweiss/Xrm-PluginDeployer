@@ -2,7 +2,11 @@
 
 namespace Xrm.PluginDeployer.References.StepModel
 {
-    public class Step
+    /// <summary>
+    /// Step Model
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+    public class Step: Attribute
     {
         public Type Class { get; set; }
         public CrmEventType EventType { get; set; }
@@ -11,10 +15,10 @@ namespace Xrm.PluginDeployer.References.StepModel
         public string[] FilteringAttributes { get; set; }
         public int ExecutionOrder { get; set; }
         public StageEnum Stage { get; set; }
-        public bool PreImage { get; set; }
-        public bool PostImage { get; set; }
-        public string ImageName { get; set; }
-        public string[] ImageAttributes { get; set; }
+        public string PreImageName { get; set; }
+        public string[] PreImageAttributes { get; set; }
+        public string PostImageName { get; set; }
+        public string[] PostImageAttributes { get; set; }
         public bool Offline { get; set; }
 
         public int Async => ( this.Stage == StageEnum.PostOperationAsyncWithDelete || this.Stage == StageEnum.PostOperationAsyncWithoutDelete ) ? 1 : 0;

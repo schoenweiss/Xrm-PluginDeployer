@@ -660,14 +660,14 @@ namespace Xrm.PluginDeployer
                         var stepToCreate = new Step
                         {
                             Class = cl, EventType = ( CrmEventType ) Enum.Parse( typeof( CrmEventType ), stepAttributeType.GetProperty( nameof(Step.EventType) ).GetValue( assStep ).ToString( ) ),
-                            ExecutionOrder = ( int ) stepAttributeType.GetProperty( nameof(Step.ExecutionOrder) ).GetValue( assStep ),
-                            FilteringAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.FilteringAttributes) ).GetValue( assStep ),
-                            PreImage = ( bool ) stepAttributeType.GetProperty( nameof(Step.PreImage) ).GetValue( assStep ),
-                            PostImage = ( bool ) stepAttributeType.GetProperty( nameof(Step.PostImage) ).GetValue( assStep ),
-                            ImageName = ( string ) stepAttributeType.GetProperty( nameof(Step.ImageName) ).GetValue( assStep ),
-                            ImageAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.ImageAttributes) ).GetValue( assStep ),
                             PrimaryEntity = ( string ) stepAttributeType.GetProperty( nameof(Step.PrimaryEntity) ).GetValue( assStep ),
                             SecondaryEntity = ( string ) stepAttributeType.GetProperty( nameof(Step.SecondaryEntity) ).GetValue( assStep ),
+                            ExecutionOrder = ( int ) stepAttributeType.GetProperty( nameof(Step.ExecutionOrder) ).GetValue( assStep ),
+                            FilteringAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.FilteringAttributes) ).GetValue( assStep ),
+                            PreImageName = ( string ) stepAttributeType.GetProperty( nameof(Step.PreImageName) ).GetValue( assStep ),
+                            PostImageName = ( string ) stepAttributeType.GetProperty( nameof(Step.PostImageName) ).GetValue( assStep ),
+                            PreImageAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.PreImageAttributes) ).GetValue( assStep ),
+                            PostImageAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.PostImageAttributes) ).GetValue( assStep ),
                             Offline = ( bool ) stepAttributeType.GetProperty( nameof(Step.Offline) ).GetValue( assStep )
                         };
 
@@ -698,7 +698,7 @@ namespace Xrm.PluginDeployer
 
 
             var sdkMessageIndex = ( from s in uow.SdkMessages.GetQuery( ) select s ).ToArray( ).ToDictionary( s => s.Name );
-            
+
             foreach( var step in stepsToCreate )
             {
                 var sdkMessage = sdkMessageIndex[ step.EventType.ToString( ) ];
@@ -804,51 +804,61 @@ namespace Xrm.PluginDeployer
 
                 images.ForEach( image =>
                 {
-                    if( image == null )
+                    var preImageDefined = !string.IsNullOrEmpty(step.PreImageName);
+
+                    if ( image == null )
                     {
+                        
+                        var attributes = preImageDefined
+                            ? step.PreImageAttributes != null && step.PreImageAttributes.Length > 0
+                                ? string.Join( ",", step.PreImageAttributes )
+                                : null
+                            : step.PostImageAttributes != null && step.PostImageAttributes.Length > 0
+                                ? string.Join( ",", step.PostImageAttributes )
+                                : null;
+
                         var imageToCreate = new SdkMessageProcessingStepImage
                         {
                             SdkMessageProcessingStepImageId = Guid.NewGuid( ),
                             SdkMessageProcessingStepId = xrmStep.ToEntityReference( ),
-                            Name = step.ImageName,
-                            EntityAlias = step.ImageName,
+                            Name = preImageDefined ? step.PreImageName : step.PostImageName,
+                            EntityAlias = preImageDefined ? step.PreImageName : step.PostImageName,
                             MessagePropertyName = step.MessagePropertyName,
-                            ImageType = step.PreImage ? new OptionSetValue( 0 ) : new OptionSetValue( 1 ),
-                            Description = step.ImageName,
+                            ImageType = preImageDefined ? new OptionSetValue( 0 ) : new OptionSetValue( 1 ),
+                            Description = preImageDefined ? step.PreImageName : step.PostImageName,
                             Relevant = true,
-                            Attributes1 = step.ImageAttributes != null && step.ImageAttributes.Length > 0
-                                ? string.Join( ",", step.ImageAttributes )
-                                : null
+                            Attributes1 = attributes
                         };
                         uow.Create( imageToCreate );
-                        if( step.PreImage )
+                        if(preImageDefined)
                         {
-                            Console.WriteLine($"Pre Image {step.ImageName} created " + step.Name);
+                            Console.WriteLine( $"Pre Image {step.PreImageName} created " + step.Name );
                         }
                         else
                         {
-                            Console.WriteLine($"Post Image {step.ImageName} created " + step.Name);
+                            Console.WriteLine( $"Post Image {step.PostImageName} created " + step.Name );
                         }
                     }
                     else
                     {
                         var clean = uow.SdkMessageProcessingStepImages.Clean( image );
 
-                        var preAtr = step.ImageAttributes == null || step.ImageAttributes.Length == 0
-                            ? null
-                            : string.Join( ",", step.ImageAttributes );
+                        var atr = preImageDefined ? step.PreImageAttributes == null || step.PreImageAttributes.Length == 0 ? null :
+                            string.Join( ",", step.PreImageAttributes ) :
+                            step.PostImageAttributes == null || step.PostImageAttributes.Length == 0 ? null :
+                            string.Join( ",", step.PostImageAttributes );
 
-                        if( preAtr != image.Attributes1 )
+                        if( atr != image.Attributes1 )
                         {
-                            clean.Attributes1 = preAtr;
+                            clean.Attributes1 = atr;
                             uow.Update( clean );
-                            if( step.PreImage )
+                            if(preImageDefined)
                             {
-                                Console.WriteLine( "Pre image updated " + step.Name + " :" + preAtr );
+                                Console.WriteLine( "Pre image updated " + step.Name + " :" + atr );
                             }
                             else
                             {
-                                Console.WriteLine( "Post image updated " + step.Name + " :" + preAtr );
+                                Console.WriteLine( "Post image updated " + step.Name + " :" + atr );
                             }
                         }
 
