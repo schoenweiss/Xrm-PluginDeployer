@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2048
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Xrm.PluginDeployer", "Xrm.PluginDeployer.csproj", "{ED226B00-8507-4FF0-83A4-522412E7F307}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Xrm.Plugin.Deployer", "Xrm.Plugin.Deployer.csproj", "{ED226B00-8507-4FF0-83A4-522412E7F307}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sample", "Sample", "{2B6D1095-B6D0-4EAD-81E8-754C1C448996}"
 EndProject
