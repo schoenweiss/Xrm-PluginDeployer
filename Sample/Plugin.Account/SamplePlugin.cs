@@ -8,12 +8,20 @@ namespace Plugin.Account
         EventType = CrmEventType.Update,
         PrimaryEntity = "account",
         Stage = StageEnum.PostOperation,
-        FilteringAttributes = new[] { "accountname" },
+        FilteringAttributes = new[] { "name" },
         ExecutionOrder = 1,
         PreImageName = "account",
-        PreImageAttributes = new[] { "accountname" },
+        PreImageAttributes = new[] { "name" },
         PostImageName = "account",
-        PostImageAttributes = new[] { "accountname" } ) ]
+        PostImageAttributes = new[] { "name" } ) ]
+    [Step(
+        EventType = CrmEventType.Create,
+        PrimaryEntity = "account",
+        Stage = StageEnum.PreOperation,
+        FilteringAttributes = new[] { "name" },
+        ExecutionOrder = 31,
+        PostImageName = "accountCreate",
+        PostImageAttributes = new[] { "name" })]
     // ReSharper disable once UnusedMember.Global
     public class SamplePlugin: IPlugin
     {

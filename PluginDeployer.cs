@@ -638,20 +638,17 @@ namespace Xrm.PluginDeployer
                 $"Successfully created steps and images of Plugin {AssemblyPlugin.GetName( ).Name} in {destinationSystem}." );
         }
 
+
         private List< Step > CreateStepsModel( string assemblyName )
         {
             var ns = assemblyName + ".Attributes.";
-            var stepAttributeType = AssemblyPlugin.GetType( ns + "StepAttribute" );
 
-            var pluginType = typeof( IPlugin );
-            var classes = ( from cl in AssemblyPlugin.GetTypes( )
-                where pluginType.IsAssignableFrom( cl ) && !cl.IsAbstract
-                select cl ).ToList( );
 
+            var classes = SearchForPlugins(); 
             var stepsToCreate = new List< Step >( );
             classes.ForEach( cl =>
             {
-                var assmSteps = cl.GetCustomAttributes( stepAttributeType, false ).ToArray( );
+                var assmSteps = cl.GetCustomAttributes( false ).ToArray( );
 
                 if( assmSteps.Length > 0 )
                 {
@@ -659,16 +656,19 @@ namespace Xrm.PluginDeployer
                     {
                         var stepToCreate = new Step
                         {
-                            Class = cl, EventType = ( CrmEventType ) Enum.Parse( typeof( CrmEventType ), stepAttributeType.GetProperty( nameof(Step.EventType) ).GetValue( assStep ).ToString( ) ),
-                            PrimaryEntity = ( string ) stepAttributeType.GetProperty( nameof(Step.PrimaryEntity) ).GetValue( assStep ),
-                            SecondaryEntity = ( string ) stepAttributeType.GetProperty( nameof(Step.SecondaryEntity) ).GetValue( assStep ),
-                            ExecutionOrder = ( int ) stepAttributeType.GetProperty( nameof(Step.ExecutionOrder) ).GetValue( assStep ),
-                            FilteringAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.FilteringAttributes) ).GetValue( assStep ),
-                            PreImageName = ( string ) stepAttributeType.GetProperty( nameof(Step.PreImageName) ).GetValue( assStep ),
-                            PostImageName = ( string ) stepAttributeType.GetProperty( nameof(Step.PostImageName) ).GetValue( assStep ),
-                            PreImageAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.PreImageAttributes) ).GetValue( assStep ),
-                            PostImageAttributes = ( string[] ) stepAttributeType.GetProperty( nameof(Step.PostImageAttributes) ).GetValue( assStep ),
-                            Offline = ( bool ) stepAttributeType.GetProperty( nameof(Step.Offline) ).GetValue( assStep )
+                            Class = cl,
+                            EventType = ( CrmEventType ) Enum.Parse( typeof( CrmEventType ), assStep.GetType().GetProperty( nameof(Step.EventType) ).GetValue( assStep ).ToString( ) ),
+                            PrimaryEntity = ( string )assStep.GetType().GetProperty( nameof(Step.PrimaryEntity) ).GetValue( assStep ),
+                            SecondaryEntity = ( string )assStep.GetType().GetProperty( nameof(Step.SecondaryEntity) ).GetValue( assStep ),
+                            ExecutionOrder = ( int )assStep.GetType().GetProperty( nameof(Step.ExecutionOrder) ).GetValue( assStep ),
+                            FilteringAttributes = ( string[] )assStep.GetType().GetProperty( nameof(Step.FilteringAttributes) ).GetValue( assStep ),
+                            PreImageName = ( string )assStep.GetType().GetProperty( nameof(Step.PreImageName) ).GetValue( assStep ),
+                            PostImageName = ( string )assStep.GetType().GetProperty( nameof(Step.PostImageName) ).GetValue( assStep ),
+                            PreImageAttributes = ( string[] )assStep.GetType().GetProperty( nameof(Step.PreImageAttributes) ).GetValue( assStep ),
+                            PostImageAttributes = ( string[] )assStep.GetType().GetProperty( nameof(Step.PostImageAttributes) ).GetValue( assStep ),
+                            Offline = ( bool )assStep.GetType().GetProperty( nameof(Step.Offline) ).GetValue( assStep ),
+                            Stage = (StageEnum) assStep.GetType().GetProperty(nameof(Step.Stage)).GetValue(assStep)
+
                         };
 
                         if( stepToCreate.ExecutionOrder == 0 )
@@ -739,6 +739,7 @@ namespace Xrm.PluginDeployer
                     EventHandler = pluginTypes[ step.Class.FullName ].ToEntityReference( ),
                     SdkMessageId = sdkMessageIndex[ step.EventType.ToString( ) ].ToEntityReference( ),
                     SdkMessageFilterId = filter?.ToEntityReference( ),
+                    FilteringAttributes = step.FilteringAttributes != null ? step.FilteringAttributes.Length > 1 ? string.Join(",",step.FilteringAttributes): step.FilteringAttributes[0] : null
                 };
 
                 if( step.Stage == StageEnum.PostOperationAsyncWithDelete )
@@ -789,89 +790,129 @@ namespace Xrm.PluginDeployer
         }
 
 
-        private static void CreateImages( UnitOfWork.UnitOfWork uow,
-                                          IEnumerable< Step > stepsToCreate,
-                                          IReadOnlyCollection< SdkMessageProcessingStepImage > allImages,
-                                          IReadOnlyDictionary< string, SdkMessageProcessingStep > stepindex )
+        private static void CreateImages(UnitOfWork.UnitOfWork uow,
+            IEnumerable<Step> stepsToCreate,
+            IReadOnlyCollection<SdkMessageProcessingStepImage> allImages,
+            IReadOnlyDictionary<string, SdkMessageProcessingStep> stepindex)
         {
-            foreach( var step in stepsToCreate )
+            foreach (var step in stepsToCreate)
             {
-                var xrmStep = stepindex[ step.UniqueName ];
+                var xrmStep = stepindex[step.UniqueName];
                 var images = (
                     from im in allImages
                     where xrmStep.SdkMessageProcessingStepId != null && im.SdkMessageProcessingStepId.Id == xrmStep.SdkMessageProcessingStepId.Value
-                    select im );
+                    select im);
+                var preImageDefined = !string.IsNullOrEmpty(step.PreImageName);
 
-                images.ForEach( image =>
+
+                if (images.Any())
                 {
-                    var preImageDefined = !string.IsNullOrEmpty(step.PreImageName);
-
-                    if ( image == null )
+                    images.ForEach(image =>
                     {
-                        
-                        var attributes = preImageDefined
-                            ? step.PreImageAttributes != null && step.PreImageAttributes.Length > 0
-                                ? string.Join( ",", step.PreImageAttributes )
-                                : null
-                            : step.PostImageAttributes != null && step.PostImageAttributes.Length > 0
-                                ? string.Join( ",", step.PostImageAttributes )
-                                : null;
 
-                        var imageToCreate = new SdkMessageProcessingStepImage
+                        if (image == null)
                         {
-                            SdkMessageProcessingStepImageId = Guid.NewGuid( ),
-                            SdkMessageProcessingStepId = xrmStep.ToEntityReference( ),
-                            Name = preImageDefined ? step.PreImageName : step.PostImageName,
-                            EntityAlias = preImageDefined ? step.PreImageName : step.PostImageName,
-                            MessagePropertyName = step.MessagePropertyName,
-                            ImageType = preImageDefined ? new OptionSetValue( 0 ) : new OptionSetValue( 1 ),
-                            Description = preImageDefined ? step.PreImageName : step.PostImageName,
-                            Relevant = true,
-                            Attributes1 = attributes
-                        };
-                        uow.Create( imageToCreate );
-                        if(preImageDefined)
-                        {
-                            Console.WriteLine( $"Pre Image {step.PreImageName} created " + step.Name );
-                        }
-                        else
-                        {
-                            Console.WriteLine( $"Post Image {step.PostImageName} created " + step.Name );
-                        }
-                    }
-                    else
-                    {
-                        var clean = uow.SdkMessageProcessingStepImages.Clean( image );
 
-                        var atr = preImageDefined ? step.PreImageAttributes == null || step.PreImageAttributes.Length == 0 ? null :
-                            string.Join( ",", step.PreImageAttributes ) :
-                            step.PostImageAttributes == null || step.PostImageAttributes.Length == 0 ? null :
-                            string.Join( ",", step.PostImageAttributes );
+                            var attributes = preImageDefined
+                                ? step.PreImageAttributes != null && step.PreImageAttributes.Length > 0
+                                    ? string.Join(",", step.PreImageAttributes)
+                                    : null
+                                : step.PostImageAttributes != null && step.PostImageAttributes.Length > 0
+                                    ? string.Join(",", step.PostImageAttributes)
+                                    : null;
 
-                        if( atr != image.Attributes1 )
-                        {
-                            clean.Attributes1 = atr;
-                            uow.Update( clean );
-                            if(preImageDefined)
+                            var imageToCreate = new SdkMessageProcessingStepImage
                             {
-                                Console.WriteLine( "Pre image updated " + step.Name + " :" + atr );
+                                SdkMessageProcessingStepImageId = Guid.NewGuid(),
+                                SdkMessageProcessingStepId = xrmStep.ToEntityReference(),
+                                Name = preImageDefined ? step.PreImageName : step.PostImageName,
+                                EntityAlias = preImageDefined ? step.PreImageName : step.PostImageName,
+                                MessagePropertyName = step.MessagePropertyName,
+                                ImageType = preImageDefined ? new OptionSetValue(0) : new OptionSetValue(1),
+                                Description = preImageDefined ? step.PreImageName : step.PostImageName,
+                                Relevant = true,
+                                Attributes1 = attributes
+                            };
+                            uow.Create(imageToCreate);
+                            if (preImageDefined)
+                            {
+                                Console.WriteLine($"Pre Image {step.PreImageName} created " + step.Name);
                             }
                             else
                             {
-                                Console.WriteLine( "Post image updated " + step.Name + " :" + atr );
+                                Console.WriteLine($"Post Image {step.PostImageName} created " + step.Name);
                             }
                         }
+                        else
+                        {
+                            var clean = uow.SdkMessageProcessingStepImages.Clean(image);
 
-                        image.Relevant = true;
+                            var atr = preImageDefined ? step.PreImageAttributes == null || step.PreImageAttributes.Length == 0 ? null :
+                                string.Join(",", step.PreImageAttributes) :
+                                step.PostImageAttributes == null || step.PostImageAttributes.Length == 0 ? null :
+                                string.Join(",", step.PostImageAttributes);
+
+                            if (atr != image.Attributes1)
+                            {
+                                clean.Attributes1 = atr;
+                                uow.Update(clean);
+                                if (preImageDefined)
+                                {
+                                    Console.WriteLine("Pre image updated " + step.Name + " :" + atr);
+                                }
+                                else
+                                {
+                                    Console.WriteLine("Post image updated " + step.Name + " :" + atr);
+                                }
+                            }
+
+                            image.Relevant = true;
+                        }
+
+                    });
+
+                }
+                else
+                {
+                    var attributes = preImageDefined
+                        ? step.PreImageAttributes != null && step.PreImageAttributes.Length > 0
+                            ? string.Join(",", step.PreImageAttributes)
+                            : null
+                        : step.PostImageAttributes != null && step.PostImageAttributes.Length > 0
+                            ? string.Join(",", step.PostImageAttributes)
+                            : null;
+
+                    var imageToCreate = new SdkMessageProcessingStepImage
+                    {
+                        SdkMessageProcessingStepImageId = Guid.NewGuid(),
+                        SdkMessageProcessingStepId = xrmStep.ToEntityReference(),
+                        Name = preImageDefined ? step.PreImageName : step.PostImageName,
+                        EntityAlias = preImageDefined ? step.PreImageName : step.PostImageName,
+                        MessagePropertyName = step.MessagePropertyName,
+                        ImageType = preImageDefined ? new OptionSetValue(0) : new OptionSetValue(1),
+                        Description = preImageDefined ? step.PreImageName : step.PostImageName,
+                        Relevant = true,
+                        Attributes1 = attributes
+                    };
+                    uow.Create(imageToCreate);
+                    if (preImageDefined)
+                    {
+                        Console.WriteLine($"Pre Image {step.PreImageName} created " + step.Name);
                     }
-                } );
+                    else
+                    {
+                        Console.WriteLine($"Post Image {step.PostImageName} created " + step.Name);
+                    }
+                }
+
             }
 
-            var notNeededs = ( from im in allImages where im.Relevant == false select im ).ToArray( );
-            foreach( var notNeeded in notNeededs )
+
+            var notNeededs = (from im in allImages where im.Relevant == false select im).ToArray();
+            foreach (var notNeeded in notNeededs)
             {
-                uow.Delete( notNeeded );
-                Console.WriteLine( "Image deleted for " + notNeeded.Name );
+                uow.Delete(notNeeded);
+                Console.WriteLine("Image deleted for " + notNeeded.Name);
             }
         }
 

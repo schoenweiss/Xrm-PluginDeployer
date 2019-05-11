@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28010.2048
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28803.156
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Xrm.Plugin.Deployer", "Xrm.Plugin.Deployer.csproj", "{ED226B00-8507-4FF0-83A4-522412E7F307}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sample", "Sample", "{2B6D1095-B6D0-4EAD-81E8-754C1C448996}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Plugin.Account", "Sample\Plugin.Account\Plugin.Account.csproj", "{6C2C94C0-A37A-4526-9A0C-F692EC8753D7}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Plugin.Account", "Sample\Plugin.Account\Plugin.Account.csproj", "{6A8C6627-6BDC-4DF0-BB9F-17BF718D63DA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,16 +19,16 @@ Global
 		{ED226B00-8507-4FF0-83A4-522412E7F307}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ED226B00-8507-4FF0-83A4-522412E7F307}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ED226B00-8507-4FF0-83A4-522412E7F307}.Release|Any CPU.Build.0 = Release|Any CPU
-		{6C2C94C0-A37A-4526-9A0C-F692EC8753D7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6C2C94C0-A37A-4526-9A0C-F692EC8753D7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6C2C94C0-A37A-4526-9A0C-F692EC8753D7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{6C2C94C0-A37A-4526-9A0C-F692EC8753D7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6A8C6627-6BDC-4DF0-BB9F-17BF718D63DA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6A8C6627-6BDC-4DF0-BB9F-17BF718D63DA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6A8C6627-6BDC-4DF0-BB9F-17BF718D63DA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6A8C6627-6BDC-4DF0-BB9F-17BF718D63DA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{6C2C94C0-A37A-4526-9A0C-F692EC8753D7} = {2B6D1095-B6D0-4EAD-81E8-754C1C448996}
+		{6A8C6627-6BDC-4DF0-BB9F-17BF718D63DA} = {2B6D1095-B6D0-4EAD-81E8-754C1C448996}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {96DD7D03-8011-4667-A220-EE7300C60051}

@@ -3,3 +3,5 @@ obj/
 packages/
 .vs/
 *.user
+Sample/Signing.snk
+Sample/Plugin.Account/Signing.snk
