@@ -1,20 +1,25 @@
 # Xrm.Plugin.Deployer
 
-This tool automates and simplifies your deployment of assemblies, its plugins, workflows, steps and images for Microsoft Dynamics 365 / Dynamics CRM in a multi system landscape. It is based on [PowerArgs](https://github.com/adamabdelhamed/PowerArgs)
+This tool automates and simplifies the deployment of assemblies, its plugins / workflows, all its steps and images for Microsoft Dynamics 365 / Dynamics CRM in a multi system landscape. It is based on [PowerArgs](https://github.com/adamabdelhamed/PowerArgs) and supports four different scenarios currently.
 
 ## Options
-```Bash
-AssemblyPath* (-A)        Path to Assembly dll
-SourceSystem (-S)         CRM-ConnectionString to source system. If this string is given, the Plugins, Steps and Images will be synchronized.
-DestinationSystem* (-D)   CRM-ConnectionString to the destination system.
-Sync (-Sy)                Syncs steps and images. (Old) steps will be deleted [Default='False'].
-Create (-C)               Creates assembly, its plugins, steps and images in destination system [Default='False'].
-Prefix (-P)               If Sync was set to true a solution will be created. Choose prefix of this solution here. [Default='PluginDeployer']
-Publisher (-Pu)           Publisher needed to create and transport solution. [Default='DefaultPublisher']
+```
+Usage - Xrm.PluginDeployer -options
+
+GlobalOption              Description
+AssemblyPath* (-A)        Path to assembly dll
+SourceSystem (-S)         Connection string to source system. If this string is given, the Plugins, Steps and Images
+                          will be synchronized.
+DestinationSystem* (-D)   Connection string to the destination system.
+Sync (-Sy)                Syncs steps and images. (Old) steps will be deleted [Default='False']
+Create (-C)               Creates assembly, its plugins, steps and images in destination system [Default='False']
+Prefix (-P)               If Sync was set to true a solution will be created. Choose prefix of this solution here.
+                          [Default='PluginDeployer']
+Publisher (-Pu)           Publisher needed to create and transport solution [Default='microsoftdynamics']
 ```
 
 ## Scenarios
-1. Create of all assembly related plugins, steps and images based on custom class decorator. :heart_eyes:
+1. Creation of all assembly related plugins, all steps and all images based on custom [attribute class](https://docs.microsoft.com/en-us/dotnet/api/system.attribute?view=netframework-4.8) decorator. :heart_eyes:
 ```Bash
 Xrm.PluginDeployer.exe -A "pathToAssembly/Assembly.dll" -D "connectionStringToCRMDestinationSystem" -C true
 ```
