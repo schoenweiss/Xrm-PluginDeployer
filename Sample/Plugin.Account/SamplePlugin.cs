@@ -1,6 +1,6 @@
 ﻿using System;
 using Microsoft.Xrm.Sdk;
-using Xrm.PluginDeployer.References.StepModel;
+using Xrm.PluginDeployer.StepModel;
 
 namespace Plugin.Account
 {
@@ -17,9 +17,8 @@ namespace Plugin.Account
     [Step(
         EventType = CrmEventType.Create,
         PrimaryEntity = "account",
-        Stage = StageEnum.PreOperation,
-        FilteringAttributes = new[] { "name" },
-        ExecutionOrder = 31,
+        Stage = StageEnum.PostOperation,
+        ExecutionOrder = 42,
         PostImageName = "accountCreate",
         PostImageAttributes = new[] { "name" })]
     // ReSharper disable once UnusedMember.Global

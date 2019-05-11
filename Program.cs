@@ -16,7 +16,7 @@ namespace Xrm.PluginDeployer
         /// <param name="args"></param>
         public static void Main( string[] args )
         {
-            var logger = new ConsoleLogger( typeof( Program ) );
+            var log = new ConsoleLogger( typeof( Program ) );
 
             CmdArgs parsedArgs;
             try
@@ -26,7 +26,7 @@ namespace Xrm.PluginDeployer
             catch( ArgException e )
             {
                 Console.WriteLine( ArgUsage.GenerateUsageFromTemplate< CmdArgs >( ) );
-                logger.Error( $"Failed to parse arguments: {e.Message}" );
+                log.Error( $"Failed to parse arguments: {e.Message}" );
                 return;
             }
 
@@ -40,7 +40,7 @@ namespace Xrm.PluginDeployer
                     sourceService = OrganizationServiceFactory.ConnectByConnectionString( parsedArgs.SourceSystem + "RequireNewInstance = True;" );
                 }
 
-                var deployer = new PluginDeployer( sourceService, destinationService, parsedArgs.Prefix, logger );
+                var deployer = new PluginDeployer( sourceService, destinationService, parsedArgs.Prefix, log );
 
                 if( !deployer.LoadAssembly( parsedArgs.AssemblyPath ) )
                 {
@@ -63,8 +63,8 @@ namespace Xrm.PluginDeployer
             }
             catch( Exception ex )
             {
-                logger.Error( $"Exception occured, terminating. Exception: {GetAllExceptionMessages( ex )}\n\n" );
-                logger.Error( $"Stacktrace: {ex.StackTrace}" );
+                log.Error( $"Exception occured, terminating. Exception: {GetAllExceptionMessages( ex )}\n\n" );
+                log.Error( $"Stacktrace: {ex.StackTrace}" );
             }
         }
 

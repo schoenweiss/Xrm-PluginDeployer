@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Xrm.PluginDeployer.References.StepModel
+namespace Xrm.PluginDeployer.StepModel
 {
     /// <summary>
     /// Step Model

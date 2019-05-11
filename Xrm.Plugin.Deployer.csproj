@@ -97,8 +97,8 @@
     <Compile Include="References\Entities\Solution.cs" />
     <Compile Include="References\Entities\SolutionComponent.cs" />
     <Compile Include="References\Entities\WebResource.cs" />
-    <Compile Include="References\Utility\ConsoleLogger.cs" />
-    <Compile Include="References\Utility\OrganizationServiceFactory.cs" />
+    <Compile Include="Utility\ConsoleLogger.cs" />
+    <Compile Include="Utility\OrganizationServiceFactory.cs" />
     <Compile Include="StepModel\CrmEventType.cs" />
     <Compile Include="StepModel\StateEnum.cs" />
     <Compile Include="StepModel\Step.cs" />

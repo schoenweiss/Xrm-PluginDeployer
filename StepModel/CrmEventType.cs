@@ -1,4 +1,4 @@
-﻿namespace Xrm.PluginDeployer.References.StepModel
+﻿namespace Xrm.PluginDeployer.StepModel
 {
     public enum CrmEventType
     {
